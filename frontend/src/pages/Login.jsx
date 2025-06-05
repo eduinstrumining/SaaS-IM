@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { loginUser, fetchCompanies } from "../api";
+import Logo from "../assets/INSTRUMINING-logo.svg"; // Importa la imagen correctamente
 
 export default function Login({ onLogin }) {
   const [companies, setCompanies] = useState([]);
@@ -44,7 +45,7 @@ export default function Login({ onLogin }) {
       {/* Logo arriba, centrado */}
       <div className="mb-10 flex justify-center w-full max-w-sm">
         <img
-          src="/src/assets/INSTRUMINING-logo.svg"
+          src={Logo}      // <-- Aquí usas la imagen importada
           alt="INSTRUMINING Logo"
           className="h-20 object-contain"
         />
