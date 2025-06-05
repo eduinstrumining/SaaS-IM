@@ -27,6 +27,8 @@ func main() {
         log.Println("[WARN] FRONTEND_URL no definido, sólo se permite localhost para CORS")
     }
 
+    log.Printf("CORS allowed origins: %v\n", allowOrigins)  // Log para debug
+
     r.Use(cors.New(cors.Config{
         AllowOrigins:     allowOrigins,
         AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
