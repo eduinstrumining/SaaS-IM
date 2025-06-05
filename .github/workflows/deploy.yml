@@ -13,17 +13,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Si tu app necesita build o dependencias, agrega aquí pasos como:
-      # - name: Instalar dependencias
-      #   run: npm install
-      # - name: Build app
-      #   run: npm run build
-
       - name: Zip source code
         run: zip -r deploy.zip . -x ".git*" "*/.git*" ".github/*"
-
-      - name: Verifica que el zip se creó
-        run: ls -lh deploy.zip
 
       - name: Deploy to Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v21
@@ -33,5 +24,5 @@ jobs:
           application_name: Saas IM
           environment_name: SaasIM-env
           version_label: ${{ github.sha }}
-          region: us-east-1
+          region: us-east-2
           deployment_package: deploy.zip
