@@ -30,7 +30,9 @@ jobs:
 
       - name: Package app for deployment
         run: |
-          zip deploy.zip application Procfile
+          cp sensor-api-go/go.mod .
+          cp sensor-api-go/go.sum .
+          zip deploy.zip application Procfile go.mod go.sum
 
       - name: Deploy to Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v21
