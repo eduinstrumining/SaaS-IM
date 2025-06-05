@@ -3,7 +3,7 @@ name: Deploy to Elastic Beanstalk
 on:
   push:
     branches:
-      - main  # O la rama que uses para producción
+      - main
 
 jobs:
   deploy:
@@ -13,19 +13,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1  # Ajusta a tu región
+      # Si tu app necesita build o dependencias, agrega aquí pasos como:
+      # - name: Instalar dependencias
+      #   run: npm install
+      # - name: Build app
+      #   run: npm run build
+
+      - name: Zip source code
+        run: zip -r deploy.zip . -x ".git*" "*/.git*" ".github/*"
+
+      - name: Verifica que el zip se creó
+        run: ls -lh deploy.zip
 
       - name: Deploy to Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v21
         with:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          application_name: "Saas IM"              # El nombre de tu aplicación
-          environment_name: "SaasIM-env"           # El nombre del entorno en Beanstalk
+          application_name: Saas IM
+          environment_name: SaasIM-env
           version_label: ${{ github.sha }}
-          region: us-east-1                        # Ajusta a tu región
+          region: us-east-1
+          deployment_package: deploy.zip
