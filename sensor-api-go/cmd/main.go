@@ -17,11 +17,14 @@ func main() {
     r := gin.Default()
 
     // ----------- CORS dinámico según entorno -----------
-    allowOrigins := []string{"http://localhost:5173"} // local
+    allowOrigins := []string{"http://localhost:5173"} // Origen local para desarrollo
+
     // Permite orígenes adicionales si defines FRONTEND_URL en producción
     frontendURL := os.Getenv("FRONTEND_URL")
     if frontendURL != "" {
         allowOrigins = append(allowOrigins, frontendURL)
+    } else {
+        log.Println("[WARN] FRONTEND_URL no definido, sólo se permite localhost para CORS")
     }
 
     r.Use(cors.New(cors.Config{
@@ -38,9 +41,10 @@ func main() {
     // ----------- Puerto dinámico: local y nube -----------
     port := os.Getenv("PORT")
     if port == "" {
-        port = "5000" // Elastic Beanstalk espera por default el 5000
+        port = "5000" // Elastic Beanstalk espera por defecto el puerto 5000
     }
     log.Printf("Servidor escuchando en el puerto %s", port)
+
     if err := r.Run(":" + port); err != nil {
         log.Fatalf("No se pudo iniciar el servidor: %v", err)
     }

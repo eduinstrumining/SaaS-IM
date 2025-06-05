@@ -83,6 +83,11 @@ function Dashboard({ token }) {
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("token") || "");
 
+  // Para debug: mostrar en consola la URL base API que usa Vite (local o prod)
+  useEffect(() => {
+    console.log("API Base URL:", import.meta.env.VITE_API_URL);
+  }, []);
+
   // Logout
   const handleLogout = () => {
     localStorage.removeItem("token");
