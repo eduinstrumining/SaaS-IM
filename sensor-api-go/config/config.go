@@ -3,6 +3,7 @@ package config
 import (
     "fmt"
     "os"
+    "log"
     "gorm.io/driver/postgres"
     "gorm.io/gorm"
 )
@@ -16,13 +17,30 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
-    return &Config{
+    dbPort := os.Getenv("DB_PORT")
+    if dbPort == "" {
+        dbPort = "5432"
+    }
+
+    cfg := &Config{
         DBHost:     os.Getenv("DB_HOST"),
-        DBPort:     os.Getenv("DB_PORT"),
+        DBPort:     dbPort,
         DBUser:     os.Getenv("DB_USER"),
         DBPassword: os.Getenv("DB_PASSWORD"),
         DBName:     os.Getenv("DB_NAME"),
     }
+
+    // Debug/log en desarrollo para detectar problemas de configuración
+    if os.Getenv("APP_DEBUG") == "1" {
+        log.Printf("[DEBUG] Config: %+v", cfg)
+    }
+
+    // Validación mínima: Detener si alguna variable crítica falta
+    if cfg.DBHost == "" || cfg.DBUser == "" || cfg.DBPassword == "" || cfg.DBName == "" {
+        log.Fatalf("ERROR: Faltan variables de entorno para la conexión a la base de datos. Revisar DB_HOST, DB_USER, DB_PASSWORD, DB_NAME, DB_PORT.")
+    }
+
+    return cfg
 }
 
 func SetupDB(cfg *Config) *gorm.DB {

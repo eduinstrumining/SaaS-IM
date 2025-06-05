@@ -10,26 +10,39 @@ import (
 )
 
 func main() {
+    // Carga config desde variables de entorno
     cfg := config.LoadConfig()
     db := config.SetupDB(cfg)
+
     r := gin.Default()
 
-    // Configuración CORS
+    // ----------- CORS dinámico según entorno -----------
+    allowOrigins := []string{"http://localhost:5173"} // local
+    // Permite orígenes adicionales si defines FRONTEND_URL en producción
+    frontendURL := os.Getenv("FRONTEND_URL")
+    if frontendURL != "" {
+        allowOrigins = append(allowOrigins, frontendURL)
+    }
+
     r.Use(cors.New(cors.Config{
-        AllowOrigins:     []string{"http://localhost:5173"}, // ⚡ Puerto frontend Vite
+        AllowOrigins:     allowOrigins,
         AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
         AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
         ExposeHeaders:    []string{"Content-Length"},
         AllowCredentials: true,
     }))
+    // ---------------------------------------------------
 
     routes.SetupRoutes(r, db)
 
-    // Puerto dinámico compatible con Beanstalk y desarrollo local
+    // ----------- Puerto dinámico: local y nube -----------
     port := os.Getenv("PORT")
     if port == "" {
-        port = "8080"
+        port = "8080" // ⚡ Cambia si prefieres 3001 u otro default
     }
     log.Printf("Servidor escuchando en el puerto %s", port)
-    r.Run(":" + port)
+    if err := r.Run(":" + port); err != nil {
+        log.Fatalf("No se pudo iniciar el servidor: %v", err)
+    }
+    // ------------------------------------------------------
 }
