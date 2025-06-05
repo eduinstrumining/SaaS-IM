@@ -41,6 +41,15 @@ export default function Login({ onLogin }) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-[#0A0D12] px-6 text-white">
+      {/* Logo arriba, centrado */}
+      <div className="mb-10 flex justify-center w-full max-w-sm">
+        <img
+          src="/src/assets/INSTRUMINING-logo.svg"
+          alt="INSTRUMINING Logo"
+          className="h-20 object-contain"
+        />
+      </div>
+
       {/* Título fuera del formulario */}
       <h1 className="text-4xl font-bold mb-10">Log in to your account</h1>
 

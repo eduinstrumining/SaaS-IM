@@ -19,12 +19,25 @@ function isTokenExpired(token) {
   }
 }
 
+// Formatea fecha a YYYY-MM-DD para inputs tipo date y query params
+function formatDate(date) {
+  return date.toISOString().split("T")[0];
+}
+
 // Dashboard principal, lo extraemos a un componente para rutearlo
 function Dashboard({ token }) {
   const [cameras, setCameras] = useState([]);
   const [selectedCamera, setSelectedCamera] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // Estado para rango de fechas preseleccionado (última semana)
+  const [dateRange, setDateRange] = useState(() => {
+    const end = new Date();
+    const start = new Date();
+    start.setDate(end.getDate() - 7);
+    return { desde: formatDate(start), hasta: formatDate(end) };
+  });
 
   useEffect(() => {
     if (!token || isTokenExpired(token)) return;
@@ -64,12 +77,20 @@ function Dashboard({ token }) {
           ))}
         </select>
       </div>
+
+      {/* Aquí podrías añadir un selector visual para cambiar el rango de fechas si quieres */}
+
       {/* Contenido del dispositivo */}
       {error && (
         <div className="text-red-400 text-sm font-semibold mb-2">{error}</div>
       )}
       {selectedCamera ? (
-        <DeviceDetail cameraId={selectedCamera} token={token} />
+        <DeviceDetail
+          cameraId={selectedCamera}
+          token={token}
+          desde={dateRange.desde}
+          hasta={dateRange.hasta}
+        />
       ) : loading ? (
         <div className="flex gap-2 items-center text-[#8C92A4] text-sm">
           <span className="animate-spin h-4 w-4 inline-block border-2 border-flowforge-accent border-t-transparent rounded-full"></span>

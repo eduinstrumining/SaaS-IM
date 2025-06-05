@@ -21,20 +21,47 @@ function getRangoFechas(horas) {
   };
 }
 
-export default function DeviceDetail({ cameraId, token, onCameraChange }) {
+export default function DeviceDetail({ cameraId, token, desde: desdeProp, hasta: hastaProp, onCameraChange }) {
   const [data, setData] = useState(null);
   const [rango, setRango] = useState("24");
   const [loading, setLoading] = useState(true);
 
+  // Estado interno para el rango usado en fetch
+  const [fetchParams, setFetchParams] = useState({ desde: null, hasta: null });
+
+  // Cuando recibimos props desde el padre (Dashboard) para fechas, los usamos
   useEffect(() => {
+    if (desdeProp && hastaProp) {
+      setFetchParams({ desde: desdeProp, hasta: hastaProp });
+      // También ajustamos el selector interno a ese rango aproximado (en horas)
+      const desdeDate = new Date(desdeProp);
+      const hastaDate = new Date(hastaProp);
+      const diffHoras = Math.round((hastaDate - desdeDate) / (1000 * 60 * 60));
+      const match = RANGOS.find((r) => Number(r.value) === diffHoras);
+      if (match) {
+        setRango(match.value);
+      }
+    }
+  }, [desdeProp, hastaProp]);
+
+  // Cuando cambia el rango local, actualizamos fetchParams para disparar fetch
+  useEffect(() => {
+    if (!desdeProp && !hastaProp) {
+      const { desde, hasta } = getRangoFechas(Number(rango));
+      setFetchParams({ desde, hasta });
+    }
+    // Nota: si vienen props de padre, se usan esos, no este efecto
+  }, [rango, desdeProp, hastaProp]);
+
+  useEffect(() => {
+    if (!cameraId || !token || !fetchParams.desde || !fetchParams.hasta) return;
     setLoading(true);
-    const { desde, hasta } = getRangoFechas(Number(rango));
-    fetchCameraStatus(cameraId, token, desde, hasta)
+    fetchCameraStatus(cameraId, token, fetchParams.desde, fetchParams.hasta)
       .then((resp) => {
         setData(resp);
       })
       .finally(() => setLoading(false));
-  }, [cameraId, token, rango]);
+  }, [cameraId, token, fetchParams]);
 
   if (loading) {
     return (
