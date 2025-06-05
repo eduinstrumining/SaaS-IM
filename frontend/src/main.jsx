@@ -8,3 +8,4 @@ ReactDOM.createRoot(document.getElementById("root")).render(
     <App />
   </React.StrictMode>
 );
+// trigger deploy jueves,  5 de junio de 2025, 12:51:43 -04
