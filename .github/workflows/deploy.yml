@@ -13,8 +13,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Zip source code
-        run: zip -r deploy.zip . -x ".git*" "*/.git*" ".github/*"
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'   # Usa la versión de tu go.mod
+
+      - name: Build Go app
+        run: |
+          cd sensor-api-go
+          go mod tidy
+          go build -o ../app
+
+      - name: Package app for deployment
+        run: zip deploy.zip app
 
       - name: Deploy to Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v21
