@@ -1,4 +1,4 @@
-name: Deploy to Elastic Beanstalk
+name: Deploy to AWS Elastic Beanstalk
 
 on:
   push:
@@ -8,7 +8,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -29,10 +28,7 @@ jobs:
           echo "web: ./application" > Procfile
 
       - name: Package app for deployment
-        run: |
-          cp sensor-api-go/go.mod .
-          cp sensor-api-go/go.sum .
-          zip deploy.zip application Procfile go.mod go.sum
+        run: zip deploy.zip application Procfile
 
       - name: Deploy to Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v21
