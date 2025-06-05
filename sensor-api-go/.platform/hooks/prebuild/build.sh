@@ -1,0 +1,1 @@
+chmod +x .platform/hooks/prebuild/build.sh
