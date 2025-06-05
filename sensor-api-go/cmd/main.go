@@ -1,6 +1,8 @@
 package main
 
 import (
+    "log"
+    "os"
     "sensor-api-go/config"
     "sensor-api-go/routes"
     "github.com/gin-gonic/gin"
@@ -22,5 +24,12 @@ func main() {
     }))
 
     routes.SetupRoutes(r, db)
-    r.Run(":8080")
+
+    // Puerto dinámico compatible con Beanstalk y desarrollo local
+    port := os.Getenv("PORT")
+    if port == "" {
+        port = "8080"
+    }
+    log.Printf("Servidor escuchando en el puerto %s", port)
+    r.Run(":" + port)
 }
