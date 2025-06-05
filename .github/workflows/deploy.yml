@@ -21,7 +21,7 @@ jobs:
         run: |
           cd sensor-api-go
           go mod tidy
-          go build -o ../application
+          go build -o ../application ./cmd/
 
       - name: Create Procfile
         run: |
