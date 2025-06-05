@@ -16,16 +16,21 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.22'   # Usa la versión de tu go.mod
+          go-version: '1.22'
 
       - name: Build Go app
         run: |
           cd sensor-api-go
           go mod tidy
-          go build -o ../app
+          go build -o ../application
+
+      - name: Create Procfile
+        run: |
+          echo "web: ./application" > Procfile
 
       - name: Package app for deployment
-        run: zip deploy.zip app
+        run: |
+          zip deploy.zip application Procfile
 
       - name: Deploy to Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v21
