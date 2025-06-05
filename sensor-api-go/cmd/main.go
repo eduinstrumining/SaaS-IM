@@ -38,7 +38,7 @@ func main() {
     // ----------- Puerto dinámico: local y nube -----------
     port := os.Getenv("PORT")
     if port == "" {
-        port = "8080" // ⚡ Cambia si prefieres 3001 u otro default
+        port = "5000" // Elastic Beanstalk espera por default el 5000
     }
     log.Printf("Servidor escuchando en el puerto %s", port)
     if err := r.Run(":" + port); err != nil {
