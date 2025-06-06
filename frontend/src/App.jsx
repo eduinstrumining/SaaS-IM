@@ -3,9 +3,9 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import DeviceDetail from "./components/DeviceDetail";
 import UserManagement from "./pages/UserManagement";
-import Alerts from "./pages/Alerts";  // <-- Importa Alerts aquí
+import Alerts from "./pages/Alerts";
 import Login from "./pages/Login";
-import { fetchCameras } from "./api";
+import { fetchCameras, API_BASE } from "./api"; // Importa la constante real
 
 // Helper para decodificar el JWT y chequear expiración
 function isTokenExpired(token) {
@@ -77,9 +77,6 @@ function Dashboard({ token }) {
           ))}
         </select>
       </div>
-
-      {/* Aquí podrías añadir un selector visual para cambiar el rango de fechas si quieres */}
-
       {/* Contenido del dispositivo */}
       {error && (
         <div className="text-red-400 text-sm font-semibold mb-2">{error}</div>
@@ -104,9 +101,9 @@ function Dashboard({ token }) {
 export default function App() {
   const [token, setToken] = useState(() => localStorage.getItem("token") || "");
 
-  // Para debug: mostrar en consola la URL base API que usa Vite (local o prod)
+  // Para debug: mostrar en consola la URL base API que realmente se usa
   useEffect(() => {
-    console.log("API Base URL:", import.meta.env.VITE_API_URL);
+    console.log("API Base URL:", API_BASE);
   }, []);
 
   // Logout
@@ -132,8 +129,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Dashboard token={token} />} />
           <Route path="/users" element={<UserManagement token={token} />} />
-          <Route path="/alerts" element={<Alerts token={token} />} />  {/* <-- Aquí agregas Alerts */}
-          {/* Aquí puedes agregar más rutas: dispositivos, configuración, etc. */}
+          <Route path="/alerts" element={<Alerts token={token} />} />
         </Routes>
       </div>
     </BrowserRouter>

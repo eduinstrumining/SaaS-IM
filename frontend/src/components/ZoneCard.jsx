@@ -1,4 +1,3 @@
-// src/components/ZoneCard.jsx
 import React from "react";
 import { Line } from "react-chartjs-2";
 import {
@@ -12,6 +11,7 @@ import {
   Legend,
   TimeScale,
 } from "chart.js";
+import 'chartjs-adapter-date-fns';
 
 ChartJS.register(
   LineElement,
@@ -24,6 +24,7 @@ ChartJS.register(
   TimeScale
 );
 
+// Formatea la hora para el eje X en rangos menores a 24h
 function formatHour(ts) {
   if (!ts) return "";
   const d = new Date(ts);
@@ -33,13 +34,38 @@ function formatHour(ts) {
   });
 }
 
-export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect }) {
-  const validReadings = Array.isArray(zone.readings)
-    ? zone.readings.filter((r) => Number(r.temperature) < 6450)
-    : [];
-  const temps = validReadings.map((r) => Number(r.temperature));
-  const times = validReadings.map((r) => formatHour(r.timestamp));
+// Downsampling visual para evitar freeze en browsers con muchos puntos
+function downsample(arr, maxPoints = 1000) {
+  if (!Array.isArray(arr) || arr.length <= maxPoints) return arr;
+  const factor = Math.ceil(arr.length / maxPoints);
+  return arr.filter((_, idx) => idx % factor === 0);
+}
 
+export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect }) {
+  // Filtra solo lecturas válidas
+  const validReadings = Array.isArray(zone.readings)
+    ? zone.readings.filter((r) =>
+        typeof r.temperature !== "undefined" &&
+        r.temperature !== null &&
+        Number(r.temperature) < 6450 &&
+        !isNaN(Number(r.temperature))
+      )
+    : [];
+
+  // Downsample (solo visual)
+  const displayReadings = downsample(validReadings, 1000);
+
+  // Temperaturas y labels del eje X
+  const temps = displayReadings.map((r) => Number(r.temperature));
+  let labels = [];
+
+  if (Number(rango) >= 24) {
+    labels = displayReadings.map((r) => new Date(r.timestamp));
+  } else {
+    labels = displayReadings.map((r) => formatHour(r.timestamp));
+  }
+
+  // Variación porcentual en el periodo seleccionado
   let variation = 0;
   if (temps.length >= 2 && temps[0] !== 0) {
     variation = Math.round(
@@ -47,8 +73,9 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
     );
   }
 
+  // DATASET CHART.JS
   const chartData = {
-    labels: times,
+    labels,
     datasets: [
       {
         label: `Temperatura zona ${zoneLabel}`,
@@ -71,21 +98,37 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
         mode: "index",
         intersect: false,
         callbacks: {
-          label: function (context) {
-            return `${context.parsed.y}°C`;
-          },
+          label: (context) => `${context.parsed.y}°C`,
         },
       },
     },
     scales: {
-      x: {
-        grid: { display: false },
-        ticks: {
-          color: "#8C92A4",
-          font: { size: 11, family: "Inter, sans-serif" },
-          maxTicksLimit: 6,
-        },
-      },
+      x: Number(rango) >= 24
+        ? {
+            type: "time",
+            time: {
+              unit: Number(rango) >= 168 ? "day" : "hour",
+              tooltipFormat: "dd/MM/yyyy HH:mm",
+              displayFormats: {
+                hour: "HH:mm",
+                day: "dd/MM",
+              },
+            },
+            grid: { display: false },
+            ticks: {
+              color: "#8C92A4",
+              font: { size: 11, family: "Inter, sans-serif" },
+              maxTicksLimit: 6,
+            },
+          }
+        : {
+            grid: { display: false },
+            ticks: {
+              color: "#8C92A4",
+              font: { size: 11, family: "Inter, sans-serif" },
+              maxTicksLimit: 6,
+            },
+          },
       y: {
         grid: { color: "#22252B", drawTicks: false, borderDash: [5, 8] },
         ticks: {
@@ -111,23 +154,6 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
   return (
     <div className="bg-flowforge-panel rounded-2xl p-6 shadow flex flex-col gap-4">
       <h2 className="text-xl font-bold">{`Zona ${zoneLabel}`}</h2>
-
-      {/* No mostrar selector */}
-      {/* {showSelect && (
-        <select
-          className="bg-flowforge-dark text-[#D1D5DB] rounded px-3 py-2 w-64 mb-2 border border-flowforge-border"
-          value={rango}
-          onChange={(e) => setRango(e.target.value)}
-        >
-          <option value="1">Última hora</option>
-          <option value="6">Últimas 6 horas</option>
-          <option value="12">Últimas 12 horas</option>
-          <option value="24">Últimas 24 horas</option>
-          <option value="168">Última semana</option>
-          <option value="720">Último mes</option>
-        </select>
-      )} */}
-
       <div className="flex flex-col md:flex-row items-end md:items-center gap-8">
         <div>
           <div className="text-4xl font-bold text-white">
@@ -146,7 +172,6 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
             {variation}%
           </div>
         </div>
-
         <div className="flex-1 min-w-[240px] h-32 sm:h-36 md:h-40">
           {temps.length > 1 ? (
             <Line data={chartData} options={chartOptions} />
@@ -160,3 +185,4 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
     </div>
   );
 }
+ 

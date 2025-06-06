@@ -1,11 +1,22 @@
-// src/components/ZoneChart.jsx
 import React from "react";
 import { Line } from "react-chartjs-2";
-import { Chart, LineElement, PointElement, LinearScale, CategoryScale, Filler } from "chart.js";
-Chart.register(LineElement, PointElement, LinearScale, CategoryScale, Filler);
+import {
+  Chart as ChartJS,
+  LineElement,
+  PointElement,
+  LinearScale,
+  CategoryScale,
+  TimeScale,
+  Filler,
+  Tooltip,
+  Legend
+} from "chart.js";
+import 'chartjs-adapter-date-fns';
 
-export default function ZoneChart({ history }) {
-  // Si no hay datos, muestra el placeholder premium
+ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, TimeScale, Filler, Tooltip, Legend);
+
+export default function ZoneChart({ history, rango = "24" }) {
+  // Si no hay datos, muestra placeholder
   if (!history || history.length === 0) {
     return (
       <div className="h-32 w-full bg-gradient-to-b from-flowforge-border to-flowforge-dark rounded-2xl flex items-center justify-center opacity-50">
@@ -14,10 +25,42 @@ export default function ZoneChart({ history }) {
     );
   }
 
-  const labels = history.map(point =>
-    point.timestamp ? new Date(point.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""
-  );
+  // Datos para chart
   const temps = history.map(point => point.temperature);
+
+  // Si rango >= 24h, usa fechas reales para eje tiempo, si no, etiquetas horarias
+  let labels, xScale;
+  if (Number(rango) >= 24) {
+    labels = history.map(point => new Date(point.timestamp));
+    xScale = {
+      type: "time",
+      time: {
+        unit: Number(rango) >= 168 ? "day" : "hour",
+        tooltipFormat: "dd/MM/yyyy HH:mm",
+        displayFormats: {
+          hour: "HH:mm",
+          day: "dd/MM"
+        }
+      },
+      grid: { display: false },
+      ticks: {
+        color: "#8C92A4",
+        font: { size: 12, family: "Inter, ui-sans-serif" },
+      }
+    };
+  } else {
+    labels = history.map(point =>
+      point.timestamp ? new Date(point.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""
+    );
+    xScale = {
+      type: "category",
+      grid: { display: false },
+      ticks: {
+        color: "#8C92A4",
+        font: { size: 12, family: "Inter, ui-sans-serif" },
+      }
+    };
+  }
 
   const data = {
     labels,
@@ -57,16 +100,9 @@ export default function ZoneChart({ history }) {
       },
     },
     scales: {
-      x: {
-        display: true,
-        ticks: {
-          color: "#8C92A4",
-          font: { size: 12, family: "Inter, ui-sans-serif" },
-        },
-        grid: { display: false },
-      },
+      x: xScale,
       y: {
-        display: false,
+        display: false, // Cambia a true si quieres mostrar eje Y
         grid: { display: false },
       },
     },

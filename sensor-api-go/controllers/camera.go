@@ -10,17 +10,19 @@ import (
     "time"
 )
 
-// Rango de temperatura aceptable
+// --- Constantes de control ---
 const (
-    minTemp = -40.0
-    maxTemp = 150.0
-    maxPoints = 500 // <--- Limitar puntos por zona
+    minTemp         = -40.0
+    maxTemp         = 150.0
+    maxPoints       = 1000
+    paginationLimit = 1000
+    maxRangeDirect  = 7 * 24 * time.Hour
 )
 
-// ----- Estructuras para status -----
+// --- Estructuras ---
 type ZoneStatus struct {
     ZoneID      int         `json:"zone_id"`
-    LastTemp    *float64    `json:"last_temp"`  // puntero para permitir null si hay outlier
+    LastTemp    *float64    `json:"last_temp"`
     LastTime    *time.Time  `json:"last_time"`
     State       string      `json:"state"`
     Readings    []TempPoint `json:"readings"`
@@ -36,7 +38,30 @@ type CameraDashboard struct {
     Zonas    []ZoneStatus `json:"zonas"`
 }
 
-// ====== NUEVA: parseo flexible de fechas ======
+type CameraWithZones struct {
+    CameraID int   `json:"camera_id"`
+    Zones    []int `json:"zones"`
+}
+
+// --- Downsampling robusto para series largas ---
+func downsample(points []TempPoint, max int) []TempPoint {
+    n := len(points)
+    if n <= max || max <= 0 {
+        return points
+    }
+    step := float64(n) / float64(max)
+    result := make([]TempPoint, max)
+    for i := 0; i < max; i++ {
+        idx := int(float64(i) * step)
+        if idx >= n {
+            idx = n - 1
+        }
+        result[i] = points[idx]
+    }
+    return result
+}
+
+// --- Parseo flexible de fechas ---
 func parseDateFlexible(dateStr string, def time.Time) time.Time {
     t, err := time.Parse(time.RFC3339, dateStr)
     if err == nil {
@@ -49,76 +74,131 @@ func parseDateFlexible(dateStr string, def time.Time) time.Time {
     return def
 }
 
-// ----- Handler: GET /api/cameras/:camera_id/status -----
+// --- Handler: GET /api/cameras/:camera_id/status ---
 func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
+        userID, _ := c.Get("user_id")
+        companyID, _ := c.Get("company_id")
+        fmt.Printf("user_id: %v, company_id: %v\n", userID, companyID)
+
         cameraID, err := strconv.Atoi(c.Param("camera_id"))
         if err != nil {
             c.JSON(http.StatusBadRequest, gin.H{"error": "camera_id inválido"})
             return
         }
 
-        // Permite ISO8601 y YYYY-MM-DD
         desdeStr := c.DefaultQuery("desde", time.Now().Add(-24*time.Hour).Format(time.RFC3339))
         hastaStr := c.DefaultQuery("hasta", time.Now().Format(time.RFC3339))
         desde := parseDateFlexible(desdeStr, time.Now().Add(-24*time.Hour))
         hasta := parseDateFlexible(hastaStr, time.Now())
-        hasta = hasta.Add(24 * time.Hour) // hasta fin del día
+        if len(hastaStr) == len("2006-01-02") {
+            hasta = hasta.Add(24 * time.Hour)
+        }
+        if hasta.Before(desde) {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "El rango de fechas es inválido"})
+            return
+        }
 
+        fmt.Printf("[DEBUG] Consulta fechas - desde: %s, hasta: %s\n", desde.UTC().Format(time.RFC3339), hasta.UTC().Format(time.RFC3339))
+
+        rangoDuracion := hasta.Sub(desde)
+        useAggregation := rangoDuracion > maxRangeDirect
+
+        // Leer zonas activas para la cámara *EN EL RANGO PEDIDO*
         var zonas []int
-        db.Model(&models.CameraReading{}).
-            Where("camera_id = ?", cameraID).
-            Distinct("zone_id").
-            Pluck("zone_id", &zonas)
+        err = db.Raw(`
+            SELECT DISTINCT zone_id 
+            FROM camera_readings 
+            WHERE camera_id = ? 
+              AND timestamp >= ? 
+              AND timestamp <= ?
+            ORDER BY zone_id
+        `, cameraID, desde, hasta).Scan(&zonas).Error
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+            return
+        }
 
         zonasStatus := []ZoneStatus{}
         for _, z := range zonas {
+            // Última lectura para mostrar estado y última temp
             var last models.CameraReading
             db.Where("camera_id = ? AND zone_id = ?", cameraID, z).
                 Order("timestamp DESC").
                 First(&last)
-
-            // Solo consideramos last si está en rango válido
             var lastTemp *float64
             var lastTime *time.Time
             if last.Temperature >= minTemp && last.Temperature <= maxTemp {
                 lastTemp = &last.Temperature
                 lastTime = &last.Timestamp
-            } else {
-                lastTemp = nil
-                lastTime = nil
             }
 
-            var history []models.CameraReading
-            db.Where("camera_id = ? AND zone_id = ? AND timestamp >= ? AND timestamp <= ?", cameraID, z, desde, hasta).
-                Order("timestamp ASC").
-                Find(&history)
+            var tempHistory []TempPoint
 
-            // Filtrar outliers en el histórico
-            tempHistory := []TempPoint{}
-            for _, h := range history {
-                if h.Temperature >= minTemp && h.Temperature <= maxTemp {
+            // Consulta AGREGADA (más de 7 días, vista materializada)
+            if useAggregation {
+                type Row struct {
+                    Bucket  time.Time
+                    AvgTemp float64
+                }
+                var rows []Row
+                err := db.Raw(`
+                    SELECT bucket, avg_temp
+                    FROM camera_readings_hourly_summary
+                    WHERE camera_id = ? AND zone_id = ? AND bucket BETWEEN ? AND ?
+                    ORDER BY bucket ASC
+                `, cameraID, z, desde, hasta).Scan(&rows).Error
+                if err != nil {
+                    c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                    return
+                }
+                for _, r := range rows {
                     tempHistory = append(tempHistory, TempPoint{
-                        Timestamp:   h.Timestamp,
-                        Temperature: h.Temperature,
+                        Timestamp:   r.Bucket,
+                        Temperature: r.AvgTemp,
                     })
                 }
+            } else {
+                // Consulta DIRECTA (menos de 7 días)
+                if rangoDuracion > maxRangeDirect {
+                    c.JSON(http.StatusBadRequest, gin.H{"error": "Rango máximo para consulta sin agregación es 7 días"})
+                    return
+                }
+                var offset int = 0
+                for {
+                    var batch []models.CameraReading
+                    err := db.Where("camera_id = ? AND zone_id = ? AND timestamp >= ? AND timestamp <= ?", cameraID, z, desde, hasta).
+                        Where("temperature BETWEEN ? AND ?", minTemp, maxTemp).
+                        Order("timestamp ASC").
+                        Limit(paginationLimit).
+                        Offset(offset).
+                        Find(&batch).Error
+                    if err != nil {
+                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                        return
+                    }
+                    if len(batch) == 0 {
+                        break
+                    }
+                    for _, h := range batch {
+                        tempHistory = append(tempHistory, TempPoint{
+                            Timestamp:   h.Timestamp,
+                            Temperature: h.Temperature,
+                        })
+                    }
+                    offset += paginationLimit
+                }
+                tempHistory = downsample(tempHistory, maxPoints)
             }
 
-            // ==== LIMITA la cantidad de puntos por zona (downsampling) ====
-            if len(tempHistory) > maxPoints {
-                tempHistory = tempHistory[len(tempHistory)-maxPoints:]
-            }
-
-            // LOG para debug rápido en backend
-            fmt.Printf("Camera %d, Zone %d, desde: %v, hasta: %v, readings enviados: %d\n", cameraID, z, desde, hasta, len(tempHistory))
-
-            // Estado: Activo si la última lectura válida fue en los últimos 10 minutos
             state := "Inactivo"
             if lastTime != nil && lastTime.After(time.Now().Add(-10*time.Minute)) {
                 state = "Activo"
             }
-
+            // SIEMPRE DEVUELVE [] NO null
+            if tempHistory == nil {
+                tempHistory = []TempPoint{}
+            }
             zonasStatus = append(zonasStatus, ZoneStatus{
                 ZoneID:   z,
                 LastTemp: lastTemp,
@@ -136,7 +216,7 @@ func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
     }
 }
 
-// ----- Handler: GET /api/camera-readings -----
+// --- Handler: GET /api/camera-readings ---
 func GetCameraReadings(db *gorm.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
         var readings []models.CameraReading
@@ -162,11 +242,11 @@ func GetCameraReadings(db *gorm.DB) gin.HandlerFunc {
                 query = query.Where("timestamp <= ?", t)
             }
         }
-        if err := query.Order("timestamp desc").Limit(1000).Find(&readings).Error; err != nil {
+        if err := query.Order("timestamp desc").Limit(paginationLimit).Find(&readings).Error; err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
             return
         }
-        // Filtra outliers antes de devolver
+
         var filtered []models.CameraReading
         for _, r := range readings {
             if r.Temperature >= minTemp && r.Temperature <= maxTemp {
@@ -177,34 +257,27 @@ func GetCameraReadings(db *gorm.DB) gin.HandlerFunc {
     }
 }
 
-// ----- Handler: GET /api/cameras -----
-type CameraWithZones struct {
-    CameraID int   `json:"camera_id"`
-    Zones    []int `json:"zones"`
-}
-
+// --- Handler: GET /api/cameras ---
 func ListUniqueCameras(db *gorm.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
-        var readings []models.CameraReading
-        if err := db.Select("camera_id, zone_id").Find(&readings).Error; err != nil {
+        var cameras []int
+        if err := db.Model(&models.CameraReading{}).Distinct("camera_id").Pluck("camera_id", &cameras).Error; err != nil {
             c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
             return
         }
-        cameras := map[int]map[int]bool{}
-        for _, r := range readings {
-            if _, ok := cameras[r.CameraID]; !ok {
-                cameras[r.CameraID] = map[int]bool{}
-            }
-            cameras[r.CameraID][r.ZoneID] = true
-        }
+
         var result []CameraWithZones
-        for cam, zonesMap := range cameras {
-            zones := []int{}
-            for z := range zonesMap {
-                zones = append(zones, z)
+        for _, camID := range cameras {
+            var zones []int
+            if err := db.Model(&models.CameraReading{}).
+                Where("camera_id = ?", camID).
+                Distinct("zone_id").
+                Pluck("zone_id", &zones).Error; err != nil {
+                c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+                return
             }
             result = append(result, CameraWithZones{
-                CameraID: cam,
+                CameraID: camID,
                 Zones:    zones,
             })
         }

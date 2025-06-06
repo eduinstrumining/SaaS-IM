@@ -1,4 +1,13 @@
-const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000/api";
+// src/api.js
+
+// Determina la base de la API correctamente en todos los entornos
+export const API_BASE =
+  typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL
+    ? import.meta.env.VITE_API_URL
+    : "http://localhost:5000/api";
+
+// Siempre loguea la base real usada
+console.log("API Base URL:", API_BASE);
 
 // --- Empresas (COMPANIES) ---
 export async function fetchCompanies() {
@@ -15,12 +24,11 @@ export async function loginUser(email, password, companyId) {
     body: JSON.stringify({ email, password, company_id: companyId }),
   });
   if (!res.ok) {
-    // Captura el mensaje del backend si existe
     let msg = "Login failed";
     try {
       const err = await res.json();
       msg = err.error || msg;
-    } catch { /* ignora */ }
+    } catch {}
     throw new Error(msg);
   }
   const data = await res.json();
@@ -41,7 +49,7 @@ export async function fetchCameras(token) {
       } else if (err.error) {
         msg = err.error;
       }
-    } catch { /* ignora */ }
+    } catch {}
     throw new Error(msg);
   }
   return await res.json();
@@ -64,7 +72,7 @@ export async function fetchCameraStatus(cameraId, token, desde, hasta) {
       } else if (err.error) {
         msg = err.error;
       }
-    } catch { /* ignora */ }
+    } catch {}
     throw new Error(msg);
   }
   return await res.json();
@@ -84,7 +92,7 @@ export async function fetchUsers(token) {
       } else if (err.error) {
         msg = err.error;
       }
-    } catch { /* ignora */ }
+    } catch {}
     throw new Error(msg);
   }
   return await res.json();
@@ -105,7 +113,7 @@ export async function createUser(userData, token) {
     try {
       const err = await res.json();
       msg = err.error || msg;
-    } catch { /* ignora */ }
+    } catch {}
     throw new Error(msg);
   }
   return await res.json();
@@ -165,7 +173,7 @@ export async function fetchDeviceAlerts(token) {
       } else if (err.error) {
         msg = err.error;
       }
-    } catch { /* ignora */ }
+    } catch {}
     throw new Error(msg);
   }
   return await res.json();

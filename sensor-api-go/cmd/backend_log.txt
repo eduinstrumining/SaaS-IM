@@ -1,0 +1,101 @@
+[GIN-debug] [WARNING] Creating an Engine instance with the Logger and Recovery middleware already attached.
+
+[GIN-debug] [WARNING] Running in "debug" mode. Switch to "release" mode in production.
+ - using env:	export GIN_MODE=release
+ - using code:	gin.SetMode(gin.ReleaseMode)
+
+2025/06/05 20:42:01 [WARN] FRONTEND_URL no definido, sólo se permite localhost para CORS
+2025/06/05 20:42:01 CORS allowed origins: [http://localhost:5173]
+[GIN-debug] POST   /api/login                --> sensor-api-go/routes.SetupRoutes.Login.func1 (4 handlers)
+[GIN-debug] GET    /api/camera-readings      --> sensor-api-go/routes.SetupRoutes.GetCameraReadings.func3 (5 handlers)
+[GIN-debug] GET    /api/cameras              --> sensor-api-go/routes.SetupRoutes.ListUniqueCameras.func5 (5 handlers)
+[GIN-debug] GET    /api/cameras/:camera_id/status --> sensor-api-go/routes.SetupRoutes.CameraStatusDashboard.func7 (5 handlers)
+[GIN-debug] GET    /api/companies            --> sensor-api-go/routes.SetupRoutes.ListCompanies.func8 (4 handlers)
+[GIN-debug] GET    /api/users                --> sensor-api-go/routes.SetupRoutes.ListUsers.func10 (5 handlers)
+[GIN-debug] POST   /api/users                --> sensor-api-go/routes.SetupRoutes.CreateUser.func12 (5 handlers)
+[GIN-debug] GET    /api/devices              --> sensor-api-go/routes.SetupRoutes.GetDevicesWithZones.func14 (5 handlers)
+[GIN-debug] GET    /api/device-alerts        --> sensor-api-go/routes.SetupRoutes.ListDeviceAlerts.func16 (5 handlers)
+[GIN-debug] POST   /api/device-alerts        --> sensor-api-go/routes.SetupRoutes.CreateDeviceAlert.func18 (5 handlers)
+[GIN-debug] PUT    /api/device-alerts/:id    --> sensor-api-go/routes.SetupRoutes.UpdateDeviceAlert.func20 (5 handlers)
+[GIN-debug] DELETE /api/device-alerts/:id    --> sensor-api-go/routes.SetupRoutes.DeleteDeviceAlert.func22 (5 handlers)
+[GIN-debug] GET    /api/zone-alerts          --> sensor-api-go/routes.SetupRoutes.ListZoneAlerts.func24 (5 handlers)
+[GIN-debug] POST   /api/zone-alerts          --> sensor-api-go/routes.SetupRoutes.CreateZoneAlert.func26 (5 handlers)
+[GIN-debug] PUT    /api/zone-alerts/:id      --> sensor-api-go/routes.SetupRoutes.UpdateZoneAlert.func28 (5 handlers)
+[GIN-debug] DELETE /api/zone-alerts/:id      --> sensor-api-go/routes.SetupRoutes.DeleteZoneAlert.func30 (5 handlers)
+2025/06/05 20:42:01 Servidor escuchando en el puerto 5000
+[GIN-debug] [WARNING] You trusted all proxies, this is NOT safe. We recommend you to set a value.
+Please check https://pkg.go.dev/github.com/gin-gonic/gin#readme-don-t-trust-all-proxies for details.
+[GIN-debug] Listening and serving HTTP on :5000
+user_id: 0dd74167-c2da-43e3-8775-7de2ebc3ea9a, company_id: a14042e0-db9f-4275-ab48-3e4b00a42649
+Rango fechas recibido - desde: 2025-06-01T00:00:00Z, hasta: 2025-06-07T23:59:59Z
+
+2025/06/05 20:42:55 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:87 [33mSLOW SQL >= 200ms
+[0m[31;1m[870.453ms] [33m[rows:6][35m SELECT DISTINCT "zone_id" FROM "camera_readings" WHERE camera_id = 1[0m
+
+2025/06/05 20:42:55 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:94 [33mSLOW SQL >= 200ms
+[0m[31;1m[294.945ms] [33m[rows:1][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 0 ORDER BY timestamp DESC,"camera_readings"."id" LIMIT 1[0m
+
+2025/06/05 20:42:56 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[1505.997ms] [33m[rows:47520][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 0 AND timestamp >= '2025-06-01 00:00:00' AND timestamp <= '2025-06-07 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 0, desde: 2025-06-01 00:00:00 +0000 UTC, hasta: 2025-06-07 23:59:59 +0000 UTC, readings enviados: 47520
+
+2025/06/05 20:42:57 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:94 [33mSLOW SQL >= 200ms
+[0m[31;1m[302.411ms] [33m[rows:1][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 1 ORDER BY timestamp DESC,"camera_readings"."id" LIMIT 1[0m
+
+2025/06/05 20:42:57 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[320.557ms] [33m[rows:47520][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 1 AND timestamp >= '2025-06-01 00:00:00' AND timestamp <= '2025-06-07 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 1, desde: 2025-06-01 00:00:00 +0000 UTC, hasta: 2025-06-07 23:59:59 +0000 UTC, readings enviados: 47520
+
+2025/06/05 20:42:58 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[242.892ms] [33m[rows:47520][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 2 AND timestamp >= '2025-06-01 00:00:00' AND timestamp <= '2025-06-07 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 2, desde: 2025-06-01 00:00:00 +0000 UTC, hasta: 2025-06-07 23:59:59 +0000 UTC, readings enviados: 47520
+
+2025/06/05 20:42:58 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[254.499ms] [33m[rows:47520][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 3 AND timestamp >= '2025-06-01 00:00:00' AND timestamp <= '2025-06-07 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 3, desde: 2025-06-01 00:00:00 +0000 UTC, hasta: 2025-06-07 23:59:59 +0000 UTC, readings enviados: 47520
+
+2025/06/05 20:42:58 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[324.230ms] [33m[rows:47520][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 4 AND timestamp >= '2025-06-01 00:00:00' AND timestamp <= '2025-06-07 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 4, desde: 2025-06-01 00:00:00 +0000 UTC, hasta: 2025-06-07 23:59:59 +0000 UTC, readings enviados: 47520
+
+2025/06/05 20:42:59 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[245.916ms] [33m[rows:47520][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 5 AND timestamp >= '2025-06-01 00:00:00' AND timestamp <= '2025-06-07 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 5, desde: 2025-06-01 00:00:00 +0000 UTC, hasta: 2025-06-07 23:59:59 +0000 UTC, readings enviados: 47520
+[GIN] 2025/06/05 - 20:43:01 | 200 |  6.879290209s |             ::1 | GET      "/api/cameras/1/status?desde=2025-06-01T00:00:00Z&hasta=2025-06-07T23:59:59Z"
+user_id: 0dd74167-c2da-43e3-8775-7de2ebc3ea9a, company_id: a14042e0-db9f-4275-ab48-3e4b00a42649
+Rango fechas recibido - desde: 2025-05-01T00:00:00Z, hasta: 2025-05-31T23:59:59Z
+
+2025/06/05 20:43:09 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:87 [33mSLOW SQL >= 200ms
+[0m[31;1m[627.558ms] [33m[rows:6][35m SELECT DISTINCT "zone_id" FROM "camera_readings" WHERE camera_id = 1[0m
+
+2025/06/05 20:43:10 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[1721.794ms] [33m[rows:146902][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 0 AND timestamp >= '2025-05-01 00:00:00' AND timestamp <= '2025-05-31 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 0, desde: 2025-05-01 00:00:00 +0000 UTC, hasta: 2025-05-31 23:59:59 +0000 UTC, readings enviados: 145415
+
+2025/06/05 20:43:11 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:94 [33mSLOW SQL >= 200ms
+[0m[31;1m[321.320ms] [33m[rows:1][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 1 ORDER BY timestamp DESC,"camera_readings"."id" LIMIT 1[0m
+
+2025/06/05 20:43:11 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[614.404ms] [33m[rows:146902][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 1 AND timestamp >= '2025-05-01 00:00:00' AND timestamp <= '2025-05-31 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 1, desde: 2025-05-01 00:00:00 +0000 UTC, hasta: 2025-05-31 23:59:59 +0000 UTC, readings enviados: 145615
+
+2025/06/05 20:43:12 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[584.274ms] [33m[rows:146902][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 2 AND timestamp >= '2025-05-01 00:00:00' AND timestamp <= '2025-05-31 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 2, desde: 2025-05-01 00:00:00 +0000 UTC, hasta: 2025-05-31 23:59:59 +0000 UTC, readings enviados: 145872
+
+2025/06/05 20:43:12 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:94 [33mSLOW SQL >= 200ms
+[0m[31;1m[201.931ms] [33m[rows:1][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 3 ORDER BY timestamp DESC,"camera_readings"."id" LIMIT 1[0m
+
+2025/06/05 20:43:13 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[559.651ms] [33m[rows:146902][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 3 AND timestamp >= '2025-05-01 00:00:00' AND timestamp <= '2025-05-31 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 3, desde: 2025-05-01 00:00:00 +0000 UTC, hasta: 2025-05-31 23:59:59 +0000 UTC, readings enviados: 145837
+
+2025/06/05 20:43:14 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[645.326ms] [33m[rows:146902][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 4 AND timestamp >= '2025-05-01 00:00:00' AND timestamp <= '2025-05-31 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 4, desde: 2025-05-01 00:00:00 +0000 UTC, hasta: 2025-05-31 23:59:59 +0000 UTC, readings enviados: 145377
+
+2025/06/05 20:43:15 [32m/Users/eduardolobosstevens/sensor-go/sensor-api-go/controllers/camera.go:110 [33mSLOW SQL >= 200ms
+[0m[31;1m[790.010ms] [33m[rows:146902][35m SELECT * FROM "camera_readings" WHERE camera_id = 1 AND zone_id = 5 AND timestamp >= '2025-05-01 00:00:00' AND timestamp <= '2025-05-31 23:59:59' ORDER BY timestamp ASC[0m
+Camera 1, Zone 5, desde: 2025-05-01 00:00:00 +0000 UTC, hasta: 2025-05-31 23:59:59 +0000 UTC, readings enviados: 145526
+[GIN] 2025/06/05 - 20:43:20 | 200 |  12.15247475s |             ::1 | GET      "/api/cameras/1/status?desde=2025-05-01T00:00:00Z&hasta=2025-05-31T23:59:59Z"
+signal: interrupt
