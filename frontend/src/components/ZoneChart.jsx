@@ -117,3 +117,4 @@ export default function ZoneChart({ history, rango = "24" }) {
     </div>
   );
 }
+// Cambio de prueba para CI/CD fullstack

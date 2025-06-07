@@ -1,37 +1,79 @@
-name: Deploy Frontend to S3
+name: Deploy Fullstack to AWS
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'frontend/**'
+      - 'sensor-api-go/**'
+      - '.github/workflows/deploy.yml'
 
 jobs:
-  deploy-frontend:
+  deploy-backend:
+    name: Deploy backend (Go) to Elastic Beanstalk
     runs-on: ubuntu-latest
-
+    defaults:
+      run:
+        working-directory: sensor-api-go
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v3
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Build binary
+        run: |
+          GOOS=linux GOARCH=amd64 go build -o app main.go
+
+      - name: Zip deploy files
+        run: |
+          zip -r deploy.zip app
+          # Si necesitas incluir carpetas como public, config o migrations, descomenta y agrega:
+          # zip -r deploy.zip app public config migrations
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v21
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: sensor-api-go           # Nombre de tu aplicación en Elastic Beanstalk
+          environment_name: sensor-api-go-env       # Nombre del entorno de Elastic Beanstalk
+          region: us-east-2
+          version_label: v-${{ github.sha }}
+          deployment_package: sensor-api-go/deploy.zip
+
+  deploy-frontend:
+    name: Deploy frontend to S3
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
 
       - name: Install dependencies
         run: npm install
-        working-directory: ./frontend
 
       - name: Build frontend
         run: npm run build
-        working-directory: ./frontend
 
-      - name: Deploy to S3
+      - name: Sync to S3
         uses: jakejarvis/s3-sync-action@v0.5.1
         with:
           args: --delete
         env:
-          AWS_S3_BUCKET: saas-im-frontend
+          AWS_S3_BUCKET: saas-im-frontend        # Nombre de tu bucket S3
           AWS_REGION: us-east-2
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
