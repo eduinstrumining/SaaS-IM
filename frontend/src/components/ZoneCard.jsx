@@ -1,3 +1,5 @@
+// src/components/ZoneCard.jsx
+
 import React from "react";
 import { Line } from "react-chartjs-2";
 import {
@@ -11,8 +13,9 @@ import {
   Legend,
   TimeScale,
 } from "chart.js";
-import 'chartjs-adapter-date-fns';
+import "chartjs-adapter-date-fns";
 
+// Registra componentes de ChartJS
 ChartJS.register(
   LineElement,
   CategoryScale,
@@ -24,7 +27,7 @@ ChartJS.register(
   TimeScale
 );
 
-// Formatea la hora para el eje X en rangos menores a 24h
+// Helpers
 function formatHour(ts) {
   if (!ts) return "";
   const d = new Date(ts);
@@ -34,38 +37,64 @@ function formatHour(ts) {
   });
 }
 
-// Downsampling visual para evitar freeze en browsers con muchos puntos
 function downsample(arr, maxPoints = 1000) {
   if (!Array.isArray(arr) || arr.length <= maxPoints) return arr;
   const factor = Math.ceil(arr.length / maxPoints);
   return arr.filter((_, idx) => idx % factor === 0);
 }
 
+// Percentil (para autoescalado eje Y)
+function getPercentile(arr, p) {
+  if (!arr.length) return 0;
+  const sorted = [...arr].sort((a, b) => a - b);
+  const idx = Math.floor(p * (sorted.length - 1));
+  return sorted[idx];
+}
+
 export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect }) {
-  // Filtra solo lecturas válidas
+  // 1. Filtra readings inválidos y atípicos
+  const minSafeTemp = 5;
+  const maxSafeTemp = 45;
   const validReadings = Array.isArray(zone.readings)
-    ? zone.readings.filter((r) =>
-        typeof r.temperature !== "undefined" &&
-        r.temperature !== null &&
-        Number(r.temperature) < 6450 &&
-        !isNaN(Number(r.temperature))
+    ? zone.readings.filter(
+        (r) =>
+          typeof r.temperature !== "undefined" &&
+          r.temperature !== null &&
+          !isNaN(Number(r.temperature)) &&
+          Number(r.temperature) >= minSafeTemp &&
+          Number(r.temperature) <= maxSafeTemp
       )
     : [];
 
-  // Downsample (solo visual)
+  // 2. Downsample visual
   const displayReadings = downsample(validReadings, 1000);
 
-  // Temperaturas y labels del eje X
+  // 3. Data series y labels eje X
   const temps = displayReadings.map((r) => Number(r.temperature));
   let labels = [];
-
+  // --- Cambia aquí: rango ya viene numérico (horas) ---
   if (Number(rango) >= 24) {
     labels = displayReadings.map((r) => new Date(r.timestamp));
   } else {
     labels = displayReadings.map((r) => formatHour(r.timestamp));
   }
 
-  // Variación porcentual en el periodo seleccionado
+  // 4. Autoescalado Y (percentiles, para evitar que outliers arruinen la visual)
+  let yMin = 0, yMax = 40;
+  if (temps.length > 2) {
+    yMin = Math.floor(getPercentile(temps, 0.02));
+    yMax = Math.ceil(getPercentile(temps, 0.98));
+    // Por si el rango es mínimo
+    if (yMin === yMax) {
+      yMin = Math.floor(Math.min(...temps));
+      yMax = Math.ceil(Math.max(...temps));
+    }
+    // Margen visual
+    yMin = Math.max(yMin - 2, minSafeTemp);
+    yMax = Math.min(yMax + 2, maxSafeTemp);
+  }
+
+  // 5. Variación porcentual en periodo seleccionado
   let variation = 0;
   if (temps.length >= 2 && temps[0] !== 0) {
     variation = Math.round(
@@ -73,7 +102,7 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
     );
   }
 
-  // DATASET CHART.JS
+  // 6. DATASET CHART.JS
   const chartData = {
     labels,
     datasets: [
@@ -130,6 +159,8 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
             },
           },
       y: {
+        min: yMin,
+        max: yMax,
         grid: { color: "#22252B", drawTicks: false, borderDash: [5, 8] },
         ticks: {
           color: "#8C92A4",
@@ -185,4 +216,3 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
     </div>
   );
 }
- 

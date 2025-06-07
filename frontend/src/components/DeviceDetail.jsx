@@ -1,90 +1,54 @@
-// src/components/DeviceDetail.jsx
-
 import React, { useEffect, useState } from "react";
 import ZoneCard from "./ZoneCard";
 import { fetchCameraStatus } from "../api";
-import { subHours, subMonths } from "date-fns";
 
-const RANGOS = [
-  { value: "24", label: "Últimas 24 horas" },
-  { value: "72", label: "Últimas 72 horas" },
-  { value: "168", label: "Última semana" },
-  { value: "720", label: "Último mes" },
-];
-
-// Devuelve fechas ISO en UTC para el rango dado en horas
-function getRangoFechas(rango) {
-  const hasta = new Date();
-  let desde;
-  if (Number(rango) === 720) {
-    desde = subMonths(hasta, 1);
-  } else {
-    desde = subHours(hasta, Number(rango));
-  }
-  return {
-    desde: desde.toISOString(),
-    hasta: hasta.toISOString(),
-  };
-}
-
-// Rango histórico de cámara 3
-const HIST_CAM3 = {
-  min: "2025-03-25T00:00:00Z",
-  max: "2025-06-05T00:00:00Z"
-};
-
+/**
+ * DeviceDetail
+ * Muestra el detalle de una cámara seleccionada, incluyendo las zonas, tabla resumen y gráficos.
+ * Recibe rango de fechas, valida entrada y pasa props seguras a los hijos.
+ */
 export default function DeviceDetail({
   cameraId,
   token,
-  desde: desdeProp,
-  hasta: hastaProp,
+  desde,
+  hasta,
   onCameraChange,
 }) {
   const [data, setData] = useState(null);
-  const [rango, setRango] = useState("24");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [fetchParams, setFetchParams] = useState({ desde: null, hasta: null });
 
-  // Maneja fechas externas si vienen como props
+  // --- Valida y formatea fechas para mayor seguridad ---
+  function getSafeDate(dateLike, fallback) {
+    const date = new Date(dateLike);
+    return isNaN(date.getTime()) ? new Date(fallback) : date;
+  }
+  // Fechas robustas (evita fechas inválidas)
+  const safeDesde = getSafeDate(desde, Date.now() - 24 * 3600 * 1000);
+  const safeHasta = getSafeDate(hasta, Date.now());
+
+  // --- Calcula el rango en horas, con fallback ultra seguro ---
+  let horas = Math.round(
+    (safeHasta.getTime() - safeDesde.getTime()) / (1000 * 60 * 60)
+  );
+  if (!Number.isFinite(horas) || horas < 1) horas = 24; // fallback mínimo de 1 día
+
   useEffect(() => {
-    if (desdeProp && hastaProp) {
-      setFetchParams({ desde: desdeProp, hasta: hastaProp });
-    }
-  }, [desdeProp, hastaProp]);
-
-  // Si no hay fechas externas, usa el rango para calcular fechas y actualizar fetchParams
-  useEffect(() => {
-    if (!desdeProp && !hastaProp) {
-      const { desde, hasta } = getRangoFechas(Number(rango));
-      setFetchParams({ desde, hasta });
-    }
-  }, [rango, desdeProp, hastaProp]);
-
-  // Fetch datos cada vez que cambian cámara, token o fetchParams
-  useEffect(() => {
-    if (!cameraId || !token || !fetchParams.desde || !fetchParams.hasta) return;
-
+    if (!cameraId || !token || !desde || !hasta) return;
     setLoading(true);
     setError("");
     setData(null);
 
-    fetchCameraStatus(cameraId, token, fetchParams.desde, fetchParams.hasta)
+    fetchCameraStatus(cameraId, token, safeDesde.toISOString(), safeHasta.toISOString())
       .then((resp) => setData(resp))
       .catch((err) => {
         let msg = err.message || "No se pudieron cargar los datos del dispositivo.";
-        if (
-          msg.includes("Rango máximo para consulta sin agregación es 7 días") ||
-          msg.includes("rango máximo permitido") ||
-          msg.includes("7 días")
-        ) {
-          msg = "El rango máximo permitido es 7 días. Usa 'Último mes' si necesitas ver más.";
-        }
         setError(msg);
         setData(null);
       })
       .finally(() => setLoading(false));
-  }, [cameraId, token, fetchParams]);
+    // eslint-disable-next-line
+  }, [cameraId, token, desde, hasta]); // Dependencias son las props originales (por consistencia)
 
   if (loading) {
     return (
@@ -103,12 +67,9 @@ export default function DeviceDetail({
     return <div className="text-red-400">No hay datos del dispositivo.</div>;
   }
 
-  // Asegura que siempre es un array de zonas
-  const zonasRaw = Array.isArray(data?.zonas)
-    ? data.zonas
-    : [];
+  // --- Prepara y filtra zonas para visualización ---
+  const zonasRaw = Array.isArray(data?.zonas) ? data.zonas : [];
 
-  // Ordena zonas y filtra lecturas inválidas
   const zonasOrdenadas = zonasRaw
     .map((zona) => ({
       ...zona,
@@ -118,11 +79,11 @@ export default function DeviceDetail({
     }))
     .sort((a, b) => (a.zone_id ?? 0) - (b.zone_id ?? 0));
 
-  // Detecta si todas las zonas no tienen readings (no hay datos en el rango)
-  const todasVacias = zonasOrdenadas.length === 0 ||
+  const todasVacias =
+    zonasOrdenadas.length === 0 ||
     zonasOrdenadas.every((z) => !z.readings || z.readings.length === 0);
 
-  // Mensaje especial para cámara 3 (puedes generalizar para otras cámaras/rangos si quieres)
+  // Mensaje especial para cámara 3
   let noDataMsg = "Sin datos suficientes para este rango.";
   if (Number(cameraId) === 3) {
     noDataMsg = (
@@ -137,42 +98,23 @@ export default function DeviceDetail({
 
   return (
     <div>
-      {/* Controles cámara y rango en línea */}
-      <div className="flex items-center gap-4 mb-6">
-        {onCameraChange && (
-          <>
-            <label className="text-gray-300 font-semibold whitespace-nowrap">
-              Selecciona cámara:
-            </label>
-            <select
-              className="bg-[#1F2937] text-white rounded-2xl px-6 py-5 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#72B1FF] transition text-lg"
-              value={cameraId}
-              onChange={(e) => onCameraChange(Number(e.target.value))}
-            >
-              <option value={1}>Cámara 1</option>
-              <option value={2}>Cámara 2</option>
-              <option value={3}>Cámara 3</option>
-            </select>
-          </>
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
+      {/* Controles cámara solo si onCameraChange viene como prop */}
+      {onCameraChange && (
+        <div className="flex items-center gap-4 mb-6">
           <label className="text-gray-300 font-semibold whitespace-nowrap">
-            Rango de fechas:
+            Selecciona cámara:
           </label>
           <select
             className="bg-[#1F2937] text-white rounded-2xl px-6 py-5 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#72B1FF] transition text-lg"
-            value={rango}
-            onChange={(e) => setRango(e.target.value)}
+            value={cameraId}
+            onChange={(e) => onCameraChange(Number(e.target.value))}
           >
-            {RANGOS.map(({ value, label }) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
+            <option value={1}>Cámara 1</option>
+            <option value={2}>Cámara 2</option>
+            <option value={3}>Cámara 3</option>
           </select>
         </div>
-      </div>
+      )}
 
       {/* Si todas las zonas están vacías, muestra un solo mensaje claro */}
       {todasVacias ? (
@@ -223,15 +165,14 @@ export default function DeviceDetail({
             </table>
           </div>
 
-          {/* Cards zonas con gráfico sin selector */}
+          {/* Cards zonas con gráfico */}
           <section className="grid gap-8">
             {zonasOrdenadas.map((z) => (
               <ZoneCard
                 key={z.zone_id}
                 zone={z}
                 zoneLabel={z.zone_id}
-                rango={rango}
-                setRango={setRango}
+                rango={horas}
                 showSelect={false}
               />
             ))}

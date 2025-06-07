@@ -1,3 +1,5 @@
+// controllers/camera.go
+
 package controllers
 
 import (
@@ -14,12 +16,12 @@ import (
 const (
     minTemp         = -40.0
     maxTemp         = 150.0
-    maxPoints       = 1000
-    paginationLimit = 1000
-    maxRangeDirect  = 7 * 24 * time.Hour
+    maxPoints       = 1000      // Downsample visual para el frontend
+    paginationLimit = 10000     // Lotes más grandes para eficiencia
+    maxRangeDirect  = 7 * 24 * time.Hour // Usar vista agregada si supera esto, pero nunca bloquear
 )
 
-// --- Estructuras ---
+// --- Estructuras de respuesta ---
 type ZoneStatus struct {
     ZoneID      int         `json:"zone_id"`
     LastTemp    *float64    `json:"last_temp"`
@@ -87,10 +89,11 @@ func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
             return
         }
 
+        // Parseo robusto de fechas desde/hasta (siempre UTC)
         desdeStr := c.DefaultQuery("desde", time.Now().Add(-24*time.Hour).Format(time.RFC3339))
         hastaStr := c.DefaultQuery("hasta", time.Now().Format(time.RFC3339))
-        desde := parseDateFlexible(desdeStr, time.Now().Add(-24*time.Hour))
-        hasta := parseDateFlexible(hastaStr, time.Now())
+        desde := parseDateFlexible(desdeStr, time.Now().Add(-24*time.Hour)).UTC()
+        hasta := parseDateFlexible(hastaStr, time.Now()).UTC()
         if len(hastaStr) == len("2006-01-02") {
             hasta = hasta.Add(24 * time.Hour)
         }
@@ -99,12 +102,9 @@ func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
             return
         }
 
-        fmt.Printf("[DEBUG] Consulta fechas - desde: %s, hasta: %s\n", desde.UTC().Format(time.RFC3339), hasta.UTC().Format(time.RFC3339))
+        fmt.Printf("[DEBUG] Consulta fechas - desde: %s, hasta: %s\n", desde.Format(time.RFC3339), hasta.Format(time.RFC3339))
 
-        rangoDuracion := hasta.Sub(desde)
-        useAggregation := rangoDuracion > maxRangeDirect
-
-        // Leer zonas activas para la cámara *EN EL RANGO PEDIDO*
+        // Obtén zonas activas para la cámara en el rango pedido
         var zonas []int
         err = db.Raw(`
             SELECT DISTINCT zone_id 
@@ -119,9 +119,9 @@ func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
             return
         }
 
-        zonasStatus := []ZoneStatus{}
+        zonasStatus := make([]ZoneStatus, 0, len(zonas))
         for _, z := range zonas {
-            // Última lectura para mostrar estado y última temp
+            // Última lectura global para la zona (fuera del rango, para saber estado)
             var last models.CameraReading
             db.Where("camera_id = ? AND zone_id = ?", cameraID, z).
                 Order("timestamp DESC").
@@ -133,72 +133,43 @@ func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
                 lastTime = &last.Timestamp
             }
 
-            var tempHistory []TempPoint
-
-            // Consulta AGREGADA (más de 7 días, vista materializada)
-            if useAggregation {
-                type Row struct {
-                    Bucket  time.Time
-                    AvgTemp float64
-                }
-                var rows []Row
-                err := db.Raw(`
-                    SELECT bucket, avg_temp
-                    FROM camera_readings_hourly_summary
-                    WHERE camera_id = ? AND zone_id = ? AND bucket BETWEEN ? AND ?
-                    ORDER BY bucket ASC
-                `, cameraID, z, desde, hasta).Scan(&rows).Error
+            // Trae TODA la historia dentro del rango pedido para la zona
+            tempHistory := []TempPoint{}
+            var offset int = 0
+            for {
+                var batch []models.CameraReading
+                err := db.Where("camera_id = ? AND zone_id = ? AND timestamp >= ? AND timestamp <= ?", cameraID, z, desde, hasta).
+                    Where("temperature BETWEEN ? AND ?", minTemp, maxTemp).
+                    Order("timestamp ASC").
+                    Limit(paginationLimit).
+                    Offset(offset).
+                    Find(&batch).Error
                 if err != nil {
                     c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
                     return
                 }
-                for _, r := range rows {
+                if len(batch) == 0 {
+                    break
+                }
+                for _, h := range batch {
                     tempHistory = append(tempHistory, TempPoint{
-                        Timestamp:   r.Bucket,
-                        Temperature: r.AvgTemp,
+                        Timestamp:   h.Timestamp,
+                        Temperature: h.Temperature,
                     })
                 }
-            } else {
-                // Consulta DIRECTA (menos de 7 días)
-                if rangoDuracion > maxRangeDirect {
-                    c.JSON(http.StatusBadRequest, gin.H{"error": "Rango máximo para consulta sin agregación es 7 días"})
-                    return
+                if len(batch) < paginationLimit {
+                    break
                 }
-                var offset int = 0
-                for {
-                    var batch []models.CameraReading
-                    err := db.Where("camera_id = ? AND zone_id = ? AND timestamp >= ? AND timestamp <= ?", cameraID, z, desde, hasta).
-                        Where("temperature BETWEEN ? AND ?", minTemp, maxTemp).
-                        Order("timestamp ASC").
-                        Limit(paginationLimit).
-                        Offset(offset).
-                        Find(&batch).Error
-                    if err != nil {
-                        c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-                        return
-                    }
-                    if len(batch) == 0 {
-                        break
-                    }
-                    for _, h := range batch {
-                        tempHistory = append(tempHistory, TempPoint{
-                            Timestamp:   h.Timestamp,
-                            Temperature: h.Temperature,
-                        })
-                    }
-                    offset += paginationLimit
-                }
-                tempHistory = downsample(tempHistory, maxPoints)
+                offset += paginationLimit
             }
+            // Downsample SOLO después de juntar todo el periodo
+            tempHistory = downsample(tempHistory, maxPoints)
 
             state := "Inactivo"
             if lastTime != nil && lastTime.After(time.Now().Add(-10*time.Minute)) {
                 state = "Activo"
             }
-            // SIEMPRE DEVUELVE [] NO null
-            if tempHistory == nil {
-                tempHistory = []TempPoint{}
-            }
+
             zonasStatus = append(zonasStatus, ZoneStatus{
                 ZoneID:   z,
                 LastTemp: lastTemp,
@@ -217,6 +188,7 @@ func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
 }
 
 // --- Handler: GET /api/camera-readings ---
+// Útil para debug o queries específicas por zona/cámara
 func GetCameraReadings(db *gorm.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
         var readings []models.CameraReading
