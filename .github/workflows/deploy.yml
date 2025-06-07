@@ -42,8 +42,8 @@ jobs:
         with:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          application_name: sensor-api-go           # Nombre de tu aplicación en Elastic Beanstalk
-          environment_name: sensor-api-go-env       # Nombre del entorno de Elastic Beanstalk
+          application_name: "Saas IM"              # OJO: con espacio y mayúsculas
+          environment_name: SaasIM-env             # Nombre del entorno, tal cual aparece en AWS
           region: us-east-2
           version_label: v-${{ github.sha }}
           deployment_package: sensor-api-go/deploy.zip
