@@ -29,7 +29,7 @@ jobs:
 
       - name: Build binary
         run: |
-          GOOS=linux GOARCH=amd64 go build -o app main.go
+          GOOS=linux GOARCH=amd64 go build -o app ./cmd/main.go
 
       - name: Zip deploy files
         run: |
