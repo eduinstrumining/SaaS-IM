@@ -23,7 +23,7 @@ func main() {
 
     r := gin.Default()
 
-    // ----------- CORS dinámico según entorno -----------
+    // ----------- CORS dinámico según entorno N-----------
     allowOrigins := []string{"http://localhost:5173"}
 
     if frontendURL := os.Getenv("FRONTEND_URL"); frontendURL != "" {
