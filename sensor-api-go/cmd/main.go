@@ -14,12 +14,10 @@ import (
 func main() {
     // --- Cargar .env desde la raíz, sin importar desde dónde corres ---
     rootEnv := filepath.Join("..", ".env")
-    if err := godotenv.Load(rootEnv); err != nil {
-        // Si no lo encuentra, intenta cargar el .env local
-        godotenv.Load(".env")
-    }
+    _ = godotenv.Load(rootEnv) // No falla si no está
+    _ = godotenv.Load(".env")  // Tampoco falla si no está
 
-    // Carga config desde variables de entorno
+    // Carga config desde variables de entorno (estructura propia)
     cfg := config.LoadConfig()
     db := config.SetupDB(cfg)
 
@@ -28,14 +26,12 @@ func main() {
     // ----------- CORS dinámico según entorno -----------
     allowOrigins := []string{"http://localhost:5173"}
 
-    frontendURL := os.Getenv("FRONTEND_URL")
-    if frontendURL != "" {
+    if frontendURL := os.Getenv("FRONTEND_URL"); frontendURL != "" {
         allowOrigins = append(allowOrigins, frontendURL)
+        log.Printf("[INFO] FRONTEND_URL permitido para CORS: %s", frontendURL)
     } else {
         log.Println("[WARN] FRONTEND_URL no definido, sólo se permite localhost para CORS")
     }
-
-    log.Printf("CORS allowed origins: %v\n", allowOrigins)
 
     r.Use(cors.New(cors.Config{
         AllowOrigins:     allowOrigins,
@@ -46,16 +42,17 @@ func main() {
     }))
     // ---------------------------------------------------
 
+    // ----------- Setea todas las rutas y API -----------
     routes.SetupRoutes(r, db)
 
     // ----------- Puerto dinámico: local y nube -----------
     port := os.Getenv("PORT")
     if port == "" {
-        port = "5000"
+        port = "5000" // Para local, por defecto
     }
-    log.Printf("Servidor escuchando en el puerto %s", port)
+    log.Printf("[INFO] Servidor escuchando en el puerto %s", port)
 
     if err := r.Run(":" + port); err != nil {
-        log.Fatalf("No se pudo iniciar el servidor: %v", err)
+        log.Fatalf("[FATAL] No se pudo iniciar el servidor: %v", err)
     }
 }
