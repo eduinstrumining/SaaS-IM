@@ -31,19 +31,23 @@ jobs:
         run: |
           GOOS=linux GOARCH=amd64 go build -o app ./cmd/main.go
 
+      - name: Ensure Procfile is present
+        run: |
+          if [ ! -f Procfile ]; then
+            echo "web: ./app" > Procfile
+          fi
+
       - name: Zip deploy files
         run: |
-          zip -r deploy.zip app
-          # Si necesitas incluir carpetas como public, config o migrations, descomenta y agrega:
-          # zip -r deploy.zip app public config migrations
+          zip -r deploy.zip app Procfile
 
       - name: Deploy to Elastic Beanstalk
         uses: einaregilsson/beanstalk-deploy@v21
         with:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          application_name: "Saas IM"              # OJO: con espacio y mayúsculas
-          environment_name: SaasIM-env             # Nombre del entorno, tal cual aparece en AWS
+          application_name: "Saas IM"             # Debe coincidir exactamente con el nombre de tu app en EB
+          environment_name: SaasIM-env            # Tal como aparece en EB
           region: us-east-2
           version_label: v-${{ github.sha }}
           deployment_package: sensor-api-go/deploy.zip

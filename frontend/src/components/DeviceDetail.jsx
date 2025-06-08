@@ -5,7 +5,7 @@ import { fetchCameraStatus } from "../api";
 /**
  * DeviceDetail
  * Muestra el detalle de una cámara seleccionada, incluyendo las zonas, tabla resumen y gráficos.
- * Recibe rango de fechas, valida entrada y pasa props seguras a los hijos.
+ * Recibe rango de fechas, valida entrada y pasa props seguras a los hijos,.
  */
 export default function DeviceDetail({
   cameraId,
