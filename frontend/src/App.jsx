@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import DeviceDetail from "./components/DeviceDetail";
@@ -30,7 +30,7 @@ function Dashboard({ token }) {
 
   // Estado para rango de fechas libre
   const today = new Date();
-  const oneWeekAgo = new Date();
+  const oneWeekAgo = new Date(today);
   oneWeekAgo.setDate(today.getDate() - 7);
 
   const [dateRange, setDateRange] = useState({
@@ -45,7 +45,7 @@ function Dashboard({ token }) {
     fetchCameras(token)
       .then((cams) => {
         setCameras(cams);
-        // Asegura cámara seleccionada válida
+        // Selecciona la primera cámara válida si la actual no existe
         if (!cams.find(c => c.camera_id === selectedCamera)) {
           setSelectedCamera(cams?.[0]?.camera_id || null);
         }
@@ -53,9 +53,33 @@ function Dashboard({ token }) {
       })
       .catch(() => setError("No se pudieron cargar las cámaras"))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line
   }, [token]);
 
-  // Si no hay cámaras, muestra mensaje
+  // Actualiza la cámara seleccionada si cambia la lista
+  useEffect(() => {
+    if (cameras.length && !cameras.find(c => c.camera_id === selectedCamera)) {
+      setSelectedCamera(cameras[0].camera_id);
+    }
+    // eslint-disable-next-line
+  }, [cameras]);
+
+  // Normaliza fechas antes de pasarlas al backend
+  const desde = new Date(dateRange.desde);
+  desde.setHours(0, 0, 0, 0);
+  const hasta = new Date(dateRange.hasta);
+  hasta.setHours(23, 59, 59, 999);
+
+  // Permite cambiar el rango de fechas
+  const handleDesdeChange = useCallback(
+    (date) => setDateRange(r => ({ ...r, desde: date })),
+    []
+  );
+  const handleHastaChange = useCallback(
+    (date) => setDateRange(r => ({ ...r, hasta: date })),
+    []
+  );
+
   if (!loading && cameras.length === 0) {
     return (
       <main className="max-w-5xl mx-auto py-10 px-4">
@@ -64,12 +88,6 @@ function Dashboard({ token }) {
       </main>
     );
   }
-
-  // Normaliza fechas antes de pasarlas al backend
-  const desde = new Date(dateRange.desde);
-  desde.setHours(0, 0, 0, 0);
-  const hasta = new Date(dateRange.hasta);
-  hasta.setHours(23, 59, 59, 999);
 
   return (
     <main className="max-w-5xl mx-auto py-10 px-4">
@@ -100,7 +118,7 @@ function Dashboard({ token }) {
           <span className="text-[#8C92A4] font-semibold text-sm">Rango de fechas:</span>
           <DatePicker
             selected={dateRange.desde}
-            onChange={date => setDateRange(r => ({ ...r, desde: date }))}
+            onChange={handleDesdeChange}
             selectsStart
             startDate={dateRange.desde}
             endDate={dateRange.hasta}
@@ -112,7 +130,7 @@ function Dashboard({ token }) {
           <span className="text-[#8C92A4] font-semibold text-sm">a</span>
           <DatePicker
             selected={dateRange.hasta}
-            onChange={date => setDateRange(r => ({ ...r, hasta: date }))}
+            onChange={handleHastaChange}
             selectsEnd
             startDate={dateRange.desde}
             endDate={dateRange.hasta}
@@ -152,10 +170,10 @@ export default function App() {
     console.log("API Base URL:", API_BASE);
   }, []);
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     localStorage.removeItem("token");
     setToken("");
-  };
+  }, []);
 
   if (!token || isTokenExpired(token)) {
     return (

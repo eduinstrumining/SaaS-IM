@@ -2,9 +2,12 @@
 
 // Determina la base de la API correctamente en todos los entornos
 export const API_BASE =
-  typeof import.meta !== "undefined" && import.meta.env && import.meta.env.VITE_API_URL
+  (typeof import.meta !== "undefined" &&
+    import.meta.env &&
+    import.meta.env.VITE_API_URL &&
+    import.meta.env.VITE_API_URL !== "")
     ? import.meta.env.VITE_API_URL
-    : "http://localhost:5000/api";
+    : (window.API_BASE_URL || "http://localhost:5000/api"); // fallback para producción y local
 
 // Siempre loguea la base real usada
 console.log("API Base URL:", API_BASE);
