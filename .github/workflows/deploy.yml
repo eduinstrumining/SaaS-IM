@@ -46,8 +46,8 @@ jobs:
         with:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          application_name: "Saas IM"             # Debe coincidir exactamente con el nombre de tu app en EB
-          environment_name: SaasIM-env            # Tal como aparece en EB
+          application_name: "Saas IM"
+          environment_name: SaasIM-env
           region: us-east-2
           version_label: v-${{ github.sha }}
           deployment_package: sensor-api-go/deploy.zip
@@ -64,10 +64,18 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies with retry
+        run: |
+          n=0
+          until [ $n -ge 3 ]
+          do
+            npm install && break
+            n=$((n+1))
+            echo "npm install failed, retrying in 5s..."
+            sleep 5
+          done
 
       - name: Build frontend
         run: npm run build
@@ -77,7 +85,7 @@ jobs:
         with:
           args: --delete
         env:
-          AWS_S3_BUCKET: saas-im-frontend        # Nombre de tu bucket S3
+          AWS_S3_BUCKET: saas-im-frontend
           AWS_REGION: us-east-2
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
