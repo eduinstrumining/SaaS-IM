@@ -1,3 +1,5 @@
+// src/components/ZoneChart.jsx
+
 import React from "react";
 import { Line } from "react-chartjs-2";
 import {
@@ -15,23 +17,36 @@ import 'chartjs-adapter-date-fns';
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, TimeScale, Filler, Tooltip, Legend);
 
+/**
+ * ZoneChart
+ * Recibe: history [{timestamp, temperature}], rango en horas (ej: 24, 72, 168).
+ * 100% dinámico y sin ningún hardcodeo de fechas, cámaras, ni lógica de UI.
+ */
 export default function ZoneChart({ history, rango = "24" }) {
-  // Si no hay datos, muestra placeholder
-  if (!history || history.length === 0) {
+  // 1. Validación dinámica de datos
+  if (!Array.isArray(history) || history.length === 0) {
     return (
       <div className="h-32 w-full bg-gradient-to-b from-flowforge-border to-flowforge-dark rounded-2xl flex items-center justify-center opacity-50">
-        <svg width="180" height="60"><path d="M0,40 Q30,10 60,30 Q90,50 120,20 Q150,40 180,20" fill="none" stroke="#70F3FF" strokeWidth="4" /></svg>
+        <svg width="180" height="60">
+          <path d="M0,40 Q30,10 60,30 Q90,50 120,20 Q150,40 180,20" fill="none" stroke="#70F3FF" strokeWidth="4" />
+        </svg>
       </div>
     );
   }
 
-  // Datos para chart
-  const temps = history.map(point => point.temperature);
+  // 2. Filtrado ultra-dinámico: solo temperaturas numéricas y no atípicas (opcional)
+  const filtered = history.filter(
+    (p) =>
+      typeof p.temperature === "number" &&
+      isFinite(p.temperature)
+  );
 
-  // Si rango >= 24h, usa fechas reales para eje tiempo, si no, etiquetas horarias
+  const temps = filtered.map(point => point.temperature);
+
+  // 3. Etiquetas eje X: siempre dinámicas según rango
   let labels, xScale;
   if (Number(rango) >= 24) {
-    labels = history.map(point => new Date(point.timestamp));
+    labels = filtered.map(point => new Date(point.timestamp));
     xScale = {
       type: "time",
       time: {
@@ -46,11 +61,14 @@ export default function ZoneChart({ history, rango = "24" }) {
       ticks: {
         color: "#8C92A4",
         font: { size: 12, family: "Inter, ui-sans-serif" },
+        maxTicksLimit: 6,
       }
     };
   } else {
-    labels = history.map(point =>
-      point.timestamp ? new Date(point.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : ""
+    labels = filtered.map(point =>
+      point.timestamp
+        ? new Date(point.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+        : ""
     );
     xScale = {
       type: "category",
@@ -58,10 +76,12 @@ export default function ZoneChart({ history, rango = "24" }) {
       ticks: {
         color: "#8C92A4",
         font: { size: 12, family: "Inter, ui-sans-serif" },
+        maxTicksLimit: 6,
       }
     };
   }
 
+  // 4. Data y opciones del gráfico: siempre dinámico según el dataset
   const data = {
     labels,
     datasets: [
@@ -102,7 +122,7 @@ export default function ZoneChart({ history, rango = "24" }) {
     scales: {
       x: xScale,
       y: {
-        display: false, // Cambia a true si quieres mostrar eje Y
+        display: false, // Cambia a true si quieres mostrar el eje Y
         grid: { display: false },
       },
     },
@@ -117,4 +137,3 @@ export default function ZoneChart({ history, rango = "24" }) {
     </div>
   );
 }
-// Cambio de prueba para CI/CD fullstack

@@ -28,15 +28,6 @@ ChartJS.register(
 );
 
 // Helpers
-function formatHour(ts) {
-  if (!ts) return "";
-  const d = new Date(ts);
-  return d.toLocaleTimeString("es-CL", {
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
 function downsample(arr, maxPoints = 1000) {
   if (!Array.isArray(arr) || arr.length <= maxPoints) return arr;
   const factor = Math.ceil(arr.length / maxPoints);
@@ -51,7 +42,13 @@ function getPercentile(arr, p) {
   return sorted[idx];
 }
 
-export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect }) {
+export default function ZoneCard({
+  zone,
+  zoneLabel,
+  desde,
+  hasta,
+  showSelect,
+}) {
   // 1. Filtra readings inválidos y atípicos
   const minSafeTemp = 5;
   const maxSafeTemp = 45;
@@ -71,25 +68,17 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
 
   // 3. Data series y labels eje X
   const temps = displayReadings.map((r) => Number(r.temperature));
-  let labels = [];
-  // --- Cambia aquí: rango ya viene numérico (horas) ---
-  if (Number(rango) >= 24) {
-    labels = displayReadings.map((r) => new Date(r.timestamp));
-  } else {
-    labels = displayReadings.map((r) => formatHour(r.timestamp));
-  }
+  const timeLabels = displayReadings.map((r) => new Date(r.timestamp));
 
   // 4. Autoescalado Y (percentiles, para evitar que outliers arruinen la visual)
   let yMin = 0, yMax = 40;
   if (temps.length > 2) {
     yMin = Math.floor(getPercentile(temps, 0.02));
     yMax = Math.ceil(getPercentile(temps, 0.98));
-    // Por si el rango es mínimo
     if (yMin === yMax) {
       yMin = Math.floor(Math.min(...temps));
       yMax = Math.ceil(Math.max(...temps));
     }
-    // Margen visual
     yMin = Math.max(yMin - 2, minSafeTemp);
     yMax = Math.min(yMax + 2, maxSafeTemp);
   }
@@ -104,7 +93,7 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
 
   // 6. DATASET CHART.JS
   const chartData = {
-    labels,
+    labels: timeLabels,
     datasets: [
       {
         label: `Temperatura zona ${zoneLabel}`,
@@ -120,6 +109,11 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
     ],
   };
 
+  // Rango de fechas (opcional para mostrar en UI)
+  let desdeStr = desde ? new Date(desde).toLocaleString("es-CL") : "";
+  let hastaStr = hasta ? new Date(hasta).toLocaleString("es-CL") : "";
+
+  // 7. Chart Options - SIEMPRE EJE DE TIEMPO CONSISTENTE
   const chartOptions = {
     plugins: {
       legend: { display: false },
@@ -132,32 +126,25 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
       },
     },
     scales: {
-      x: Number(rango) >= 24
-        ? {
-            type: "time",
-            time: {
-              unit: Number(rango) >= 168 ? "day" : "hour",
-              tooltipFormat: "dd/MM/yyyy HH:mm",
-              displayFormats: {
-                hour: "HH:mm",
-                day: "dd/MM",
-              },
-            },
-            grid: { display: false },
-            ticks: {
-              color: "#8C92A4",
-              font: { size: 11, family: "Inter, sans-serif" },
-              maxTicksLimit: 6,
-            },
-          }
-        : {
-            grid: { display: false },
-            ticks: {
-              color: "#8C92A4",
-              font: { size: 11, family: "Inter, sans-serif" },
-              maxTicksLimit: 6,
-            },
+      x: {
+        type: "time",
+        time: {
+          unit: "hour",
+          tooltipFormat: "dd/MM/yyyy HH:mm",
+          displayFormats: {
+            hour: "HH:mm",
+            day: "dd/MM",
           },
+        },
+        min: desde,
+        max: hasta,
+        grid: { display: false },
+        ticks: {
+          color: "#8C92A4",
+          font: { size: 11, family: "Inter, sans-serif" },
+          maxTicksLimit: 6,
+        },
+      },
       y: {
         min: yMin,
         max: yMax,
@@ -201,6 +188,13 @@ export default function ZoneCard({ zone, zoneLabel, rango, setRango, showSelect 
           >
             Periodo seleccionado {variation > 0 ? "+" : ""}
             {variation}%
+          </div>
+          <div className="text-xs text-[#8C92A4] mt-2">
+            {desdeStr && hastaStr ? (
+              <>
+                {desdeStr} <span className="font-bold">→</span> {hastaStr}
+              </>
+            ) : null}
           </div>
         </div>
         <div className="flex-1 min-w-[240px] h-32 sm:h-36 md:h-40">

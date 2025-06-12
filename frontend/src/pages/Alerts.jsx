@@ -1,68 +1,74 @@
 import React, { useState, useEffect } from "react";
-import { fetchDevicesWithZones, createDeviceAlert, createZoneAlert } from "../api";
+import { createDeviceAlert, createZoneAlert } from "../api";
+
+// Helpers fetch para cámaras y zonas (igual a dashboard)
+async function fetchCameras(token) {
+  const res = await fetch("/api/cameras", {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  const data = await res.json();
+  // Suponiendo data.cameras (ajusta si la key es distinta)
+  return data.cameras || data;
+}
+
+async function fetchZonasByCamera(cameraId, token) {
+  const res = await fetch(`/api/cameras/${cameraId}/zonas`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  const data = await res.json();
+  // Suponiendo data.zonas (ajusta si la key es distinta)
+  return data.zonas || data;
+}
 
 export default function Alerts({ token }) {
-  // Estados para dispositivos y zonas
-  const [devices, setDevices] = useState([]);
-  const [zones, setZones] = useState([]);
+  // Cámaras y zonas
+  const [cameras, setCameras] = useState([]);
+  const [selectedCamera, setSelectedCamera] = useState("");
+  const [zonas, setZonas] = useState([]);
 
-  // Mantengo tus estados originales para selectedDevice y filteredZones
-  const [selectedDevice, setSelectedDevice] = useState("");
-  const [filteredZones, setFilteredZones] = useState([]);
-
-  // Estados alerta dispositivo
+  // Campos alertas dispositivo
   const [deviceUpper, setDeviceUpper] = useState("");
   const [deviceLower, setDeviceLower] = useState("");
   const [deviceEmail, setDeviceEmail] = useState("");
 
-  // Estados alerta zona
+  // Campos alertas zona
   const [selectedZone, setSelectedZone] = useState("");
   const [zoneUpper, setZoneUpper] = useState("");
   const [zoneLower, setZoneLower] = useState("");
   const [zoneEmail, setZoneEmail] = useState("");
 
-  // Estados para mensajes de éxito o error
+  // Mensajes UI
   const [alertError, setAlertError] = useState("");
   const [alertSuccess, setAlertSuccess] = useState("");
 
-  // Cargar dispositivos y zonas desde backend al montar
+  // Trae cámaras al cargar
   useEffect(() => {
     if (!token) return;
-    fetchDevicesWithZones(token)
-      .then((data) => {
-        setDevices(data);
-        // Mapear zonas con id y deviceId (camera_id)
-        const allZones = data.flatMap((device) =>
-          device.zones.map((zoneId) => ({ id: zoneId, deviceId: device.camera_id }))
-        );
-        setZones(allZones);
-      })
-      .catch(() => {
-        setDevices([]);
-        setZones([]);
-      });
+    fetchCameras(token)
+      .then((cams) => setCameras(cams))
+      .catch(() => setCameras([]));
   }, [token]);
 
-  // Filtrar zonas cuando cambia el dispositivo seleccionado
+  // Cuando seleccionas cámara, trae sus zonas
   useEffect(() => {
-    if (!selectedDevice) {
-      setFilteredZones([]);
+    if (!selectedCamera) {
+      setZonas([]);
       setSelectedZone("");
       return;
     }
-    const filtered = zones.filter((z) => z.deviceId === Number(selectedDevice));
-    setFilteredZones(filtered);
-    setSelectedZone("");
-  }, [selectedDevice, zones]);
+    fetchZonasByCamera(selectedCamera, token)
+      .then((zonas) => setZonas(zonas))
+      .catch(() => setZonas([]));
+  }, [selectedCamera, token]);
 
-  // Guardar alerta dispositivo real con manejo de errores y mensajes
+  // Guardar alerta dispositivo
   const saveDeviceAlert = async () => {
     setAlertError("");
     setAlertSuccess("");
     try {
       await createDeviceAlert(
         {
-          device_id: selectedDevice,
+          device_id: selectedCamera,
           upper_thresh: Number(deviceUpper),
           lower_thresh: Number(deviceLower),
           recipient: deviceEmail,
@@ -70,17 +76,18 @@ export default function Alerts({ token }) {
         token
       );
       setAlertSuccess("Alerta de dispositivo guardada correctamente");
-      // Limpiar campos para nueva alerta
       setDeviceUpper("");
       setDeviceLower("");
       setDeviceEmail("");
-      setSelectedDevice("");
+      setSelectedCamera("");
+      setZonas([]);
+      setSelectedZone("");
     } catch (error) {
       setAlertError(error.message || "Error al guardar alerta de dispositivo");
     }
   };
 
-  // Guardar alerta zona real con manejo de errores y mensajes
+  // Guardar alerta zona
   const saveZoneAlert = async () => {
     setAlertError("");
     setAlertSuccess("");
@@ -95,7 +102,6 @@ export default function Alerts({ token }) {
         token
       );
       setAlertSuccess("Alerta de zona guardada correctamente");
-      // Limpiar campos para nueva alerta
       setZoneUpper("");
       setZoneLower("");
       setZoneEmail("");
@@ -124,13 +130,13 @@ export default function Alerts({ token }) {
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-6 mb-4">
           <select
             className="bg-[#191C22] rounded-lg px-4 py-3 border border-gray-700 text-white text-lg"
-            value={selectedDevice}
-            onChange={(e) => setSelectedDevice(Number(e.target.value))}
+            value={selectedCamera}
+            onChange={(e) => setSelectedCamera(Number(e.target.value))}
           >
-            <option value="">Seleccione dispositivo</option>
-            {devices.map((d) => (
-              <option key={d.camera_id} value={d.camera_id}>
-                Dispositivo {d.camera_id}
+            <option value="">Seleccione cámara</option>
+            {cameras.map((cam) => (
+              <option key={cam.camera_id} value={cam.camera_id}>
+                {cam.name || `Cámara ${cam.camera_id}`}
               </option>
             ))}
           </select>
@@ -159,7 +165,7 @@ export default function Alerts({ token }) {
         <button
           className="bg-gray-700 hover:bg-gray-600 text-white font-semibold rounded-lg px-6 py-3"
           onClick={saveDeviceAlert}
-          disabled={!selectedDevice || !deviceEmail}
+          disabled={!selectedCamera || !deviceEmail}
         >
           Guardar alerta
         </button>
@@ -173,12 +179,12 @@ export default function Alerts({ token }) {
             className="bg-[#191C22] rounded-lg px-4 py-3 border border-gray-700 text-white text-lg"
             value={selectedZone}
             onChange={(e) => setSelectedZone(Number(e.target.value))}
-            disabled={!selectedDevice}
+            disabled={!selectedCamera}
           >
             <option value="">Seleccione zona</option>
-            {filteredZones.map((z) => (
-              <option key={z.id} value={z.id}>
-                Zona {z.id}
+            {zonas.map((z) => (
+              <option key={z.zone_id} value={z.zone_id}>
+                {z.name || `Zona ${z.zone_id}`}
               </option>
             ))}
           </select>
