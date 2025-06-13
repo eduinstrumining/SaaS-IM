@@ -121,7 +121,7 @@ export default function Alerts({ token }) {
     try {
       await createZoneAlert(
         {
-          zone_id: zoneId,
+          zone_id: String(zoneId), // 👈 CORREGIDO: siempre string para el backend Go
           upper_thresh: Number(cfg.upper),
           lower_thresh: Number(cfg.lower),
           recipient: correo,
