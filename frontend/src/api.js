@@ -7,10 +7,12 @@ export const API_BASE =
     import.meta.env.VITE_API_URL &&
     import.meta.env.VITE_API_URL !== "")
     ? import.meta.env.VITE_API_URL
-    : (window.API_BASE_URL || "http://localhost:5000/api"); // fallback para producción y local
+    : (typeof window !== "undefined" && window.API_BASE_URL ? window.API_BASE_URL : "http://localhost:5000/api");
 
 // Siempre loguea la base real usada
-console.log("API Base URL:", API_BASE);
+try {
+  console.log("API Base URL:", API_BASE);
+} catch (_) {}
 
 // --- Empresas (COMPANIES) ---
 export async function fetchCompanies() {
@@ -21,7 +23,9 @@ export async function fetchCompanies() {
 
 // --- Login (requiere companyId) ---
 export async function loginUser(email, password, companyId) {
-  const res = await fetch(`${API_BASE}/login`, {
+  // Usa el endpoint correcto según tu backend
+  const loginUrl = `${API_BASE}/login`;
+  const res = await fetch(loginUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password, company_id: companyId }),

@@ -1,9 +1,9 @@
-// src/context/AuthContext.js
+// src/context/AuthContext.jsx
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 
 // Creamos el contexto de autenticación
-const AuthContext = createContext();
+export const AuthContext = createContext(); // <--- AHORA exporta explícitamente
 
 // Proveedor del contexto de autenticación
 export function AuthProvider({ children }) {
@@ -24,11 +24,11 @@ export function AuthProvider({ children }) {
     else localStorage.removeItem("user");
   }, [token, company, user]);
 
-  // Función de login
+  // Función de login (recibe objeto o valores individuales)
   const login = ({ token, company, user }) => {
     setToken(token);
-    setCompany(company);
-    setUser(user);
+    setCompany(company || "");
+    setUser(user || "");
     // El useEffect anterior se encarga de sincronizar el localStorage
   };
 
@@ -41,7 +41,7 @@ export function AuthProvider({ children }) {
   };
 
   // Valor que entrega el contexto a los hijos
-  const value = { token, company, user, login, logout };
+  const value = { token, company, user, login, logout, setToken };
 
   return (
     <AuthContext.Provider value={value}>

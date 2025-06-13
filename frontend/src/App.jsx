@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useEffect, useState, useCallback, useContext } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import DeviceDetail from "./components/DeviceDetail";
@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import { fetchCameras, API_BASE } from "./api";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { AuthContext } from "./context/AuthContext"; // <--- Importa tu contexto
 
 // Helper para decodificar el JWT y chequear expiración
 function isTokenExpired(token) {
@@ -40,7 +41,11 @@ function Dashboard({ token }) {
 
   // Actualiza cámaras disponibles
   useEffect(() => {
-    if (!token || isTokenExpired(token)) return;
+    if (!token || isTokenExpired(token)) {
+      setError("Sesión expirada o token inválido. Inicia sesión nuevamente.");
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     fetchCameras(token)
       .then((cams) => {
@@ -79,6 +84,16 @@ function Dashboard({ token }) {
     (date) => setDateRange(r => ({ ...r, hasta: date })),
     []
   );
+
+  // --- Mostrar error SIEMPRE que exista ---
+  if (error) {
+    return (
+      <main className="max-w-5xl mx-auto py-10 px-4">
+        <h1 className="text-2xl font-bold mb-4">Dispositivo: Sensor de Temperatura</h1>
+        <div className="text-red-400">{error}</div>
+      </main>
+    );
+  }
 
   if (!loading && cameras.length === 0) {
     return (
@@ -143,9 +158,6 @@ function Dashboard({ token }) {
         </div>
       </div>
       {/* Contenido del dispositivo */}
-      {error && (
-        <div className="text-red-400 text-sm font-semibold mb-2">{error}</div>
-      )}
       {selectedCamera ? (
         <DeviceDetail
           cameraId={selectedCamera}
@@ -164,16 +176,16 @@ function Dashboard({ token }) {
 }
 
 export default function App() {
-  const [token, setToken] = useState(() => localStorage.getItem("token") || "");
+  // Usa el AuthContext (así tu login, logout y protección están centralizados)
+  const { token, setToken, logout } = useContext(AuthContext);
 
   useEffect(() => {
     console.log("API Base URL:", API_BASE);
   }, []);
 
   const handleLogout = useCallback(() => {
-    localStorage.removeItem("token");
-    setToken("");
-  }, []);
+    logout(); // Usa el método del contexto, así limpia todo (incluyendo localStorage)
+  }, [logout]);
 
   if (!token || isTokenExpired(token)) {
     return (

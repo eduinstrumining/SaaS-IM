@@ -34,12 +34,31 @@ function downsample(arr, maxPoints = 1000) {
   return arr.filter((_, idx) => idx % factor === 0);
 }
 
-// Percentil (para autoescalado eje Y)
 function getPercentile(arr, p) {
   if (!arr.length) return 0;
   const sorted = [...arr].sort((a, b) => a - b);
   const idx = Math.floor(p * (sorted.length - 1));
   return sorted[idx];
+}
+
+// Nuevo: agrega puntos vacíos para mostrar el eje X completo
+function fillTimeRange(readings, desde, hasta) {
+  const points = [...readings];
+  if (desde) {
+    const desdeDate = new Date(desde);
+    // Si el primer dato está después del inicio, inyecta un punto vacío
+    if (!points.length || new Date(points[0].timestamp) > desdeDate) {
+      points.unshift({ timestamp: desdeDate.toISOString(), temperature: null });
+    }
+  }
+  if (hasta) {
+    const hastaDate = new Date(hasta);
+    // Si el último dato está antes del final, inyecta un punto vacío
+    if (!points.length || new Date(points[points.length - 1].timestamp) < hastaDate) {
+      points.push({ timestamp: hastaDate.toISOString(), temperature: null });
+    }
+  }
+  return points;
 }
 
 export default function ZoneCard({
@@ -63,35 +82,36 @@ export default function ZoneCard({
       )
     : [];
 
-  // 2. Downsample visual
-  const displayReadings = downsample(validReadings, 1000);
+  // --- AQUI agregamos los puntos extremos ---
+  const displayReadings = downsample(fillTimeRange(validReadings, desde, hasta), 1000);
 
-  // 3. Data series y labels eje X
-  const temps = displayReadings.map((r) => Number(r.temperature));
+  // Data series y labels eje X
+  const temps = displayReadings.map((r) => r.temperature === null ? null : Number(r.temperature));
   const timeLabels = displayReadings.map((r) => new Date(r.timestamp));
 
-  // 4. Autoescalado Y (percentiles, para evitar que outliers arruinen la visual)
+  // Autoescalado Y (percentiles)
+  const filteredTemps = temps.filter((t) => t !== null);
   let yMin = 0, yMax = 40;
-  if (temps.length > 2) {
-    yMin = Math.floor(getPercentile(temps, 0.02));
-    yMax = Math.ceil(getPercentile(temps, 0.98));
+  if (filteredTemps.length > 2) {
+    yMin = Math.floor(getPercentile(filteredTemps, 0.02));
+    yMax = Math.ceil(getPercentile(filteredTemps, 0.98));
     if (yMin === yMax) {
-      yMin = Math.floor(Math.min(...temps));
-      yMax = Math.ceil(Math.max(...temps));
+      yMin = Math.floor(Math.min(...filteredTemps));
+      yMax = Math.ceil(Math.max(...filteredTemps));
     }
     yMin = Math.max(yMin - 2, minSafeTemp);
     yMax = Math.min(yMax + 2, maxSafeTemp);
   }
 
-  // 5. Variación porcentual en periodo seleccionado
+  // Variación porcentual en periodo seleccionado
   let variation = 0;
-  if (temps.length >= 2 && temps[0] !== 0) {
+  if (filteredTemps.length >= 2 && filteredTemps[0] !== 0) {
     variation = Math.round(
-      ((temps[temps.length - 1] - temps[0]) / Math.abs(temps[0])) * 100
+      ((filteredTemps[filteredTemps.length - 1] - filteredTemps[0]) / Math.abs(filteredTemps[0])) * 100
     );
   }
 
-  // 6. DATASET CHART.JS
+  // DATASET CHART.JS
   const chartData = {
     labels: timeLabels,
     datasets: [
@@ -105,15 +125,12 @@ export default function ZoneCard({
         pointRadius: 0,
         borderWidth: 3,
         cubicInterpolationMode: "monotone",
+        spanGaps: true, // <-- Importante para que Chart.js muestre saltos en los huecos
       },
     ],
   };
 
-  // Rango de fechas (opcional para mostrar en UI)
-  let desdeStr = desde ? new Date(desde).toLocaleString("es-CL") : "";
-  let hastaStr = hasta ? new Date(hasta).toLocaleString("es-CL") : "";
-
-  // 7. Chart Options - SIEMPRE EJE DE TIEMPO CONSISTENTE
+  // Chart Options
   const chartOptions = {
     plugins: {
       legend: { display: false },
@@ -121,7 +138,8 @@ export default function ZoneCard({
         mode: "index",
         intersect: false,
         callbacks: {
-          label: (context) => `${context.parsed.y}°C`,
+          label: (context) =>
+            context.parsed.y !== null ? `${context.parsed.y}°C` : "Sin datos",
         },
       },
     },
@@ -136,13 +154,13 @@ export default function ZoneCard({
             day: "dd/MM",
           },
         },
-        min: desde,
-        max: hasta,
+        min: desde ? new Date(desde) : undefined,
+        max: hasta ? new Date(hasta) : undefined,
         grid: { display: false },
         ticks: {
           color: "#8C92A4",
           font: { size: 11, family: "Inter, sans-serif" },
-          maxTicksLimit: 6,
+          maxTicksLimit: 8,
         },
       },
       y: {
@@ -153,7 +171,7 @@ export default function ZoneCard({
           color: "#8C92A4",
           font: { size: 11, family: "Inter, sans-serif" },
           callback: (v) => v + "°C",
-          maxTicksLimit: 5,
+          maxTicksLimit: 6,
         },
       },
     },
@@ -169,13 +187,19 @@ export default function ZoneCard({
     maintainAspectRatio: false,
   };
 
+  // Fechas del rango visual (UI)
+  let desdeStr = desde ? new Date(desde).toLocaleString("es-CL") : "";
+  let hastaStr = hasta ? new Date(hasta).toLocaleString("es-CL") : "";
+
   return (
     <div className="bg-flowforge-panel rounded-2xl p-6 shadow flex flex-col gap-4">
       <h2 className="text-xl font-bold">{`Zona ${zoneLabel}`}</h2>
       <div className="flex flex-col md:flex-row items-end md:items-center gap-8">
         <div>
           <div className="text-4xl font-bold text-white">
-            {temps.length ? `${Math.round(temps[temps.length - 1])}°C` : "--"}
+            {filteredTemps.length
+              ? `${Math.round(filteredTemps[filteredTemps.length - 1])}°C`
+              : "--"}
           </div>
           <div
             className={`text-xs mt-1 font-semibold ${
@@ -198,7 +222,7 @@ export default function ZoneCard({
           </div>
         </div>
         <div className="flex-1 min-w-[240px] h-32 sm:h-36 md:h-40">
-          {temps.length > 1 ? (
+          {filteredTemps.length > 1 ? (
             <Line data={chartData} options={chartOptions} />
           ) : (
             <div className="h-full flex items-center justify-center text-[#8C92A4]">
