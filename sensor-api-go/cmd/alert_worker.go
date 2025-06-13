@@ -1,74 +1,94 @@
-// cmd/alert_worker.go
-
 package main
 
 import (
 	"fmt"
+	"log"
+	"time"
+
 	"sensor-api-go/config"
 	"sensor-api-go/models"
 	"sensor-api-go/utils"
-	"time"
 
+	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
 
 func main() {
-	db := config.NewDB()
-	fmt.Println("🚨 [ALERT WORKER] Iniciando worker de alertas de zonas...")
+	// Cargar variables de entorno desde .env
+	godotenv.Load()
 
-	ticker := time.NewTicker(10 * time.Second)
-	defer ticker.Stop()
+	// Configuración y conexión a la base de datos
+	cfg := config.LoadConfig()
+	db := config.SetupDB(cfg)
+
+	log.Println("[ALERT WORKER] Iniciado. Supervisando zonas cada 10 segundos...")
 
 	for {
-		checkAlerts(db)
-		<-ticker.C
+		revisarZonas(db)
+		time.Sleep(10 * time.Second)
 	}
 }
 
-func checkAlerts(db *gorm.DB) {
+func revisarZonas(db *gorm.DB) {
+	// Trae todas las alertas configuradas
 	var alerts []models.ZoneAlert
 	if err := db.Find(&alerts).Error; err != nil {
-		fmt.Println("[ALERT WORKER] Error al obtener ZoneAlerts:", err)
+		log.Printf("[ALERT WORKER] Error obteniendo alertas: %v", err)
 		return
 	}
+
 	for _, za := range alerts {
-		// Busca la última lectura de la zona
+		// Buscar la última lectura de esa zona
 		var reading models.CameraReading
 		err := db.Where("zone_id = ?", za.ZoneID).
 			Order("timestamp DESC").
 			First(&reading).Error
+
 		if err != nil {
-			// Puede que no haya lecturas aún
-			continue
-		}
-		// Si no hay temperaturas válidas, sigue
-		if reading.ID == 0 {
+			// Si no hay lecturas para esa zona, ignorar
 			continue
 		}
 
-		// ¿Temperatura fuera de umbrales?
+		// Verifica si está fuera de umbrales
 		if reading.Temperature > za.UpperThresh || reading.Temperature < za.LowerThresh {
-			subject := "⚠️ Alerta de Temperatura (SENSOR TERMOGRÁFICO)"
+			// Enviar alerta solo si está fuera de umbrales
+			subject := fmt.Sprintf("[ALERTA] Cámara %d Zona %d fuera de umbral", reading.CameraID, reading.ZoneID)
 			body := fmt.Sprintf(`
-                <h2>Se detectó una anomalía de temperatura</h2>
-                <p>
-                    <b>Cámara:</b> %v<br>
-                    <b>Zona:</b> %v<br>
-                    <b>Temperatura actual:</b> %.2f°C<br>
-                    <b>Umbral Inferior:</b> %.2f°C<br>
-                    <b>Umbral Superior:</b> %.2f°C<br>
-                    <b>Fecha/Hora:</b> %v<br>
-                </p>
-            `, reading.CameraID, reading.ZoneID, reading.Temperature, za.LowerThresh, za.UpperThresh, reading.Timestamp.Format("2006-01-02 15:04:05"))
+                <b>¡Alerta de temperatura!</b><br/>
+                <ul>
+                  <li><b>Cámara:</b> %d</li>
+                  <li><b>Zona:</b> %d</li>
+                  <li><b>Temperatura:</b> %.2f°C</li>
+                  <li><b>Umbral superior:</b> %.2f°C</li>
+                  <li><b>Umbral inferior:</b> %.2f°C</li>
+                  <li><b>Fecha/Hora:</b> %s</li>
+                </ul>
+                <b>Motivo:</b> %s
+            `,
+				reading.CameraID,
+				reading.ZoneID,
+				reading.Temperature,
+				za.UpperThresh,
+				za.LowerThresh,
+				reading.Timestamp.Format(time.RFC3339),
+				motivo(reading.Temperature, za.UpperThresh, za.LowerThresh),
+			)
 
-			// Envía el correo
-			err = utils.SendEmail(za.Recipient, subject, body)
-			if err != nil {
-				fmt.Printf("[ALERT WORKER] Error al enviar alerta por email a %s: %v\n", za.Recipient, err)
+			if err := utils.SendEmail(za.Recipient, subject, body); err != nil {
+				log.Printf("[ALERT WORKER] Error enviando alerta: %v", err)
 			} else {
-				fmt.Printf("[ALERT WORKER] Alerta enviada a %s (zona %v)\n", za.Recipient, reading.ZoneID)
+				log.Printf("[ALERT WORKER] Alerta enviada: Cámara %d Zona %d -> %s", reading.CameraID, reading.ZoneID, za.Recipient)
 			}
-			// OPCIONAL: Aquí puedes guardar log de alerta enviada, si lo deseas
 		}
 	}
+}
+
+func motivo(temp, upper, lower float64) string {
+	if temp > upper {
+		return "Temperatura sobre el umbral permitido"
+	}
+	if temp < lower {
+		return "Temperatura bajo el umbral permitido"
+	}
+	return "Anomalía detectada"
 }
