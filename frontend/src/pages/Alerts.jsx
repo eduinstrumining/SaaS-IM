@@ -136,15 +136,15 @@ export default function Alerts({ token }) {
 
   // =================== RENDER ====================
   return (
-    <div className="max-w-3xl mx-auto py-14 px-4 text-white font-sans">
-      <h1 className="text-5xl font-black mb-1 tracking-tight" style={{letterSpacing: '-2px'}}>Alertas por Zona</h1>
-      <p className="mb-10 text-gray-300 text-lg">
+    <div className="max-w-3xl mx-auto py-8 px-4 text-white font-sans">
+      <h1 className="text-2xl font-bold mb-2 tracking-tight">Alertas por Zona</h1>
+      <p className="mb-8 text-gray-300 text-base">
         Selecciona una <span className="text-cyan-400 font-semibold">cámara</span>, ingresa un <span className="text-cyan-400 font-semibold">correo destinatario</span> y define umbrales para cada zona monitoreada.
       </p>
       {/* Selección de cámara y correo global */}
-      <div className="mb-10 flex gap-4 flex-wrap items-center">
+      <div className="mb-8 flex gap-3 flex-wrap items-center">
         <select
-          className="bg-[#21242B] rounded-xl px-5 py-3 border border-[#343741] text-white text-lg font-bold min-w-[160px] shadow-md focus:outline-cyan-400"
+          className="bg-[#21242B] rounded-lg px-3 py-2 border border-[#343741] text-white text-base font-semibold min-w-[140px] shadow-sm focus:outline-cyan-400"
           value={selectedCamera}
           onChange={e => setSelectedCamera(Number(e.target.value))}
           disabled={loadingCameras || cameras.length === 0}
@@ -167,7 +167,7 @@ export default function Alerts({ token }) {
         </select>
         <input
           type="email"
-          className="bg-[#21242B] rounded-xl px-5 py-3 border border-[#343741] text-white text-lg w-80 font-medium shadow-md"
+          className="bg-[#21242B] rounded-lg px-3 py-2 border border-[#343741] text-white text-base w-64 font-medium shadow-sm"
           placeholder="Correo destinatario (requiere @)"
           value={correo}
           onChange={e => setCorreo(e.target.value)}
@@ -177,31 +177,31 @@ export default function Alerts({ token }) {
 
       {/* Sin cámaras */}
       {cameras.length === 0 && !loadingCameras && (
-        <div className="text-gray-400 text-md mb-6">
+        <div className="text-gray-400 text-sm mb-5">
           No hay cámaras disponibles.
         </div>
       )}
 
       {/* Sin zonas */}
       {zonas.length === 0 && selectedCamera && (
-        <div className="text-gray-400 text-md mb-6">
+        <div className="text-gray-400 text-sm mb-5">
           No hay zonas para esta cámara.
         </div>
       )}
 
       {/* Lista de zonas con configuración */}
-      <div className="space-y-5">
+      <div className="space-y-3">
         {zonas.map((z, idx) => {
           const id = typeof z.zone_id !== "undefined" ? z.zone_id : (typeof z.id !== "undefined" ? z.id : idx);
           return (
             <div
               key={`zona-${id}`}
-              className="flex flex-wrap items-center justify-between bg-[#22252D] rounded-2xl px-7 py-5 shadow-lg border border-[#343741]"
+              className="flex flex-wrap items-center justify-between bg-[#22252D] rounded-xl px-5 py-3 shadow border border-[#343741] gap-3"
             >
-              <div className="text-xl font-extrabold min-w-[100px]">{z.name || `Zona ${id}`}</div>
+              <div className="text-base font-bold min-w-[92px]">{z.name || `Zona ${id}`}</div>
               <input
                 type="number"
-                className="bg-[#181A20] rounded-lg px-4 py-2 border border-[#343741] text-white text-base w-32 mx-2 font-semibold placeholder-gray-500"
+                className="bg-[#181A20] rounded px-3 py-2 border border-[#343741] text-white text-sm w-28 mx-1 font-semibold placeholder-gray-500"
                 placeholder="Umbral sup (°C)"
                 value={zoneConfigs[id]?.upper ?? ""}
                 onChange={e =>
@@ -210,7 +210,7 @@ export default function Alerts({ token }) {
               />
               <input
                 type="number"
-                className="bg-[#181A20] rounded-lg px-4 py-2 border border-[#343741] text-white text-base w-32 mx-2 font-semibold placeholder-gray-500"
+                className="bg-[#181A20] rounded px-3 py-2 border border-[#343741] text-white text-sm w-28 mx-1 font-semibold placeholder-gray-500"
                 placeholder="Umbral inf (°C)"
                 value={zoneConfigs[id]?.lower ?? ""}
                 onChange={e =>
@@ -218,12 +218,12 @@ export default function Alerts({ token }) {
                 }
               />
               <button
-                className="bg-cyan-600 hover:bg-cyan-500 text-white font-bold rounded-lg px-6 py-2 ml-3 shadow transition"
+                className="bg-cyan-600 hover:bg-cyan-500 text-white font-semibold rounded px-4 py-2 ml-2 shadow transition text-sm"
                 onClick={() => saveZoneAlert(id)}
               >
                 Guardar
               </button>
-              <div className="text-xs mt-1 min-h-[20px] w-full text-right text-green-400 font-semibold">
+              <div className="text-xs mt-1 min-h-[18px] w-full text-right text-green-400 font-semibold">
                 {statusMsg[id]}
               </div>
             </div>

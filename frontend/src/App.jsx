@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 import { fetchCameras, API_BASE } from "./api";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import DeviceZones from "./pages/DeviceZones"; // <--- Importación agregada
 import { AuthContext } from "./context/AuthContext"; // <--- Importa tu contexto
 
 // Helper para decodificar el JWT y chequear expiración
@@ -203,6 +204,8 @@ export default function App() {
           <Route path="/" element={<Dashboard token={token} />} />
           <Route path="/users" element={<UserManagement token={token} />} />
           <Route path="/alerts" element={<Alerts token={token} />} />
+          {/* ---- Nueva ruta para termómetros de zonas ---- */}
+          <Route path="/zonas" element={<DeviceZones />} />
         </Routes>
       </div>
     </BrowserRouter>

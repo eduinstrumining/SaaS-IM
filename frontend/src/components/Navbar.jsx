@@ -32,6 +32,16 @@ export default function Navbar({ onLogout }) {
         >
           Dispositivos
         </NavLink>
+        {/* ---- Nuevo NavLink para zonas (termómetros) ---- */}
+        <NavLink
+          to="/zonas"
+          className={({ isActive }) =>
+            "hover:text-white" + (isActive ? " text-white font-bold" : "")
+          }
+        >
+          Zonas (Termómetros)
+        </NavLink>
+        {/* ---- Fin del nuevo ---- */}
         <NavLink
           to="/alerts"
           className={({ isActive }) =>
