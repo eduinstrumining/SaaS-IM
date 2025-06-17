@@ -47,7 +47,7 @@ jobs:
           aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           application_name: "Saas IM"
-          environment_name: SaasIM-env
+          environment_name: Saasim-prod-env
           region: us-east-2
           version_label: v-${{ github.sha }}
           deployment_package: sensor-api-go/deploy.zip
