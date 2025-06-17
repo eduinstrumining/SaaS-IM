@@ -11,6 +11,12 @@ import (
 // SetupRoutes define todas las rutas protegidas y públicas del API.
 // Compatible con despliegue local y en la nube (AWS/RDS).
 func SetupRoutes(r *gin.Engine, db *gorm.DB) {
+	// --------- Endpoint público para health check ---------
+	r.GET("/api/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{"status": "ok"})
+	})
+	// -----------------------------------------------------
+
 	api := r.Group("/api")
 	{
 		// --- Autenticación ---
