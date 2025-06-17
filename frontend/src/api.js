@@ -23,7 +23,6 @@ export async function fetchCompanies() {
 
 // --- Login (requiere companyId) ---
 export async function loginUser(email, password, companyId) {
-  // Usa el endpoint correcto según tu backend
   const loginUrl = `${API_BASE}/login`;
   const res = await fetch(loginUrl, {
     method: "POST",
@@ -79,6 +78,22 @@ export async function fetchCameraStatus(cameraId, token, desde, hasta) {
       } else if (err.error) {
         msg = err.error;
       }
+    } catch {}
+    throw new Error(msg);
+  }
+  return await res.json();
+}
+
+// --- Zonas de una cámara (en tiempo real) ---
+export async function fetchCameraZones(cameraId, token) {
+  const res = await fetch(`${API_BASE}/cameras/${cameraId}/zonas`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) {
+    let msg = "Error al obtener zonas de la cámara";
+    try {
+      const err = await res.json();
+      msg = err.error || msg;
     } catch {}
     throw new Error(msg);
   }

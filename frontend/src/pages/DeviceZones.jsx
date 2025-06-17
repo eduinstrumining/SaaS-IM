@@ -1,14 +1,13 @@
-// src/pages/DeviceZones.jsx
 import React, { useEffect, useState, useContext } from "react";
-import { fetchCameras, fetchCameraStatus } from "../api";
+import { fetchCameras, fetchCameraZones } from "../api";
 import Thermometer from "../components/Thermometer";
 import { AuthContext } from "../context/AuthContext";
 
 // Utilidad para localStorage (umbral máximo por zona)
 const getUserMaxTemp = (cameraId, zoneId) => {
-  const key = `zone_max_${cameraId}_${zoneId}`;
+  const key = `zone_max_${cameraId}_${zone_id}`;
   const v = window.localStorage.getItem(key);
-  return v ? parseFloat(v) : 40; // Valor por defecto: 40°C
+  return v ? parseFloat(v) : 40;
 };
 const setUserMaxTemp = (cameraId, zoneId, value) => {
   const key = `zone_max_${cameraId}_${zoneId}`;
@@ -21,10 +20,10 @@ export default function DeviceZones() {
   const [selectedCamera, setSelectedCamera] = useState(null);
   const [zonas, setZonas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editMax, setEditMax] = useState({}); // { [zoneId]: bool }
-  const [maxVals, setMaxVals] = useState({}); // { [zoneId]: valor }
+  const [editMax, setEditMax] = useState({});
+  const [maxVals, setMaxVals] = useState({});
 
-  // Trae cámaras
+  // Trae cámaras una vez por token
   useEffect(() => {
     setLoading(true);
     fetchCameras(token)
@@ -33,28 +32,34 @@ export default function DeviceZones() {
         setSelectedCamera(cams?.[0]?.camera_id ?? null);
       })
       .finally(() => setLoading(false));
-    // eslint-disable-next-line
   }, [token]);
 
-  // Trae status de cámara (zonas)
+  // Trae zonas y refresca automáticamente cada 8 segundos
   useEffect(() => {
-    if (!selectedCamera) return;
-    setLoading(true);
-    fetchCameraStatus(selectedCamera, token)
-      .then((data) => {
-        setZonas(data.zonas || []);
-        // Setea max por zona
-        const newMax = {};
-        (data.zonas || []).forEach(z => {
-          newMax[z.zone_id] = getUserMaxTemp(selectedCamera, z.zone_id);
-        });
-        setMaxVals(newMax);
-      })
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line
+    let intervalId;
+    const fetchZonas = () => {
+      if (!selectedCamera) return;
+      setLoading(true);
+      fetchCameraZones(selectedCamera, token)
+        .then((data) => {
+          setZonas(data.zonas || []);
+          const newMax = {};
+          (data.zonas || []).forEach(z => {
+            newMax[z.zone_id] = getUserMaxTemp(selectedCamera, z.zone_id);
+          });
+          setMaxVals(newMax);
+        })
+        .finally(() => setLoading(false));
+    };
+
+    fetchZonas();
+    intervalId = setInterval(fetchZonas, 8000); // cada 8 segundos
+
+    return () => {
+      clearInterval(intervalId);
+    };
   }, [selectedCamera, token]);
 
-  // Editar el umbral
   const handleMaxChange = (zoneId, val) => {
     setMaxVals(v => ({ ...v, [zoneId]: val }));
     setUserMaxTemp(selectedCamera, zoneId, val);
@@ -94,51 +99,14 @@ export default function DeviceZones() {
               borderRadius: "2rem",
               boxShadow: "0 6px 32px rgba(0,0,0,0.4)",
               padding: "16px 10px",
-              minWidth: 150,
-              opacity: zona.state === "Activo" ? 1 : 0.6 // Atenúa si está inactivo
+              minWidth: 150
             }}
           >
-            {/* Estado visual arriba del termómetro */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: 8, marginBottom: 6
-            }}>
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 12, height: 12,
-                  borderRadius: "50%",
-                  background: zona.state === "Activo" ? "#32e18a" : "#B0B0B0",
-                  border: "1.5px solid #191B22"
-                }}
-                title={zona.state}
-              />
-              <span
-                style={{
-                  color: zona.state === "Activo" ? "#32e18a" : "#B0B0B0",
-                  fontWeight: 600,
-                  fontSize: 13,
-                  letterSpacing: 0.5
-                }}
-              >
-                {zona.state === "Activo" ? "En tiempo real" : "Sin datos recientes"}
-              </span>
-            </div>
             <Thermometer
               currentTemp={zona.last_temp ?? null}
               userMax={maxVals[zona.zone_id] ?? 40}
-              zoneName={`Zona ${zona.zone_id}`}
-              inactive={zona.state !== "Activo"}
+              zoneName={zona.name || `Zona ${zona.zone_id}`}
             />
-            {/* Última lectura */}
-            <div style={{
-              color: "#bbb", fontSize: 12, marginTop: 2
-            }}>
-              Última lectura: {zona.last_time
-                ? new Date(zona.last_time).toLocaleString("es-CL", {
-                    hour: "2-digit", minute: "2-digit", second: "2-digit"
-                  })
-                : "N/A"}
-            </div>
             <div style={{ marginTop: 8 }}>
               {editMax[zona.zone_id] ? (
                 <div>

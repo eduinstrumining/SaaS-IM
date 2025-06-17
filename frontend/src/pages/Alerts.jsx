@@ -1,38 +1,6 @@
+// src/pages/Alerts.jsx
 import React, { useState, useEffect } from "react";
-import { createZoneAlert, API_BASE } from "../api";
-
-// =================== HELPERS ====================
-async function fetchCameras(token) {
-  try {
-    const res = await fetch(`${API_BASE}/cameras`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) throw new Error("Error al obtener cámaras");
-    const data = await res.json();
-    if (Array.isArray(data.cameras)) return data.cameras;
-    if (Array.isArray(data)) return data;
-    return [];
-  } catch (e) {
-    console.error("Error fetchCameras:", e);
-    return [];
-  }
-}
-
-async function fetchZonasByCamera(cameraId, token) {
-  try {
-    const res = await fetch(`${API_BASE}/cameras/${cameraId}/zonas`, {
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    });
-    if (!res.ok) throw new Error("Error al obtener zonas");
-    const data = await res.json();
-    if (Array.isArray(data.zonas)) return data.zonas;
-    if (Array.isArray(data)) return data;
-    return [];
-  } catch (e) {
-    console.error("Error fetchZonasByCamera:", e);
-    return [];
-  }
-}
+import { fetchCameras, fetchCameraZones, createZoneAlert } from "../api";
 
 // =================== COMPONENT ====================
 export default function Alerts({ token }) {
@@ -53,7 +21,7 @@ export default function Alerts({ token }) {
       .then((cams) => {
         setCameras(cams);
         setLoadingCameras(false);
-        if (cams.length && !cams.find(c => (c.camera_id || c.id) === selectedCamera)) {
+        if (cams.length && !cams.find(c => (c.camera_id || c.id) === Number(selectedCamera))) {
           setSelectedCamera(cams[0].camera_id || cams[0].id || "");
         }
       })
@@ -62,7 +30,8 @@ export default function Alerts({ token }) {
         setLoadingCameras(false);
         console.error("Error al cargar cámaras", e);
       });
-  }, [token]); // eslint-disable-line
+    // eslint-disable-next-line
+  }, [token]);
 
   // ----------- Carga zonas al seleccionar cámara -----------
   useEffect(() => {
@@ -71,9 +40,9 @@ export default function Alerts({ token }) {
       setZoneConfigs({});
       return;
     }
-    fetchZonasByCamera(selectedCamera, token)
-      .then((zonas) => {
-        let zonasArr = zonas;
+    fetchCameraZones(Number(selectedCamera), token)
+      .then((data) => {
+        let zonasArr = Array.isArray(data.zonas) ? data.zonas : data;
         if (zonasArr.length > 0 && typeof zonasArr[0] === "number") {
           zonasArr = zonasArr.map(id => ({
             zone_id: id,
@@ -97,7 +66,8 @@ export default function Alerts({ token }) {
         setZonas([]);
         console.error("Error al cargar zonas", e);
       });
-  }, [selectedCamera, token]); // eslint-disable-line
+    // eslint-disable-next-line
+  }, [selectedCamera, token]);
 
   // ----------- Cambia valores input por zona -----------
   const handleConfigChange = (zoneId, field, value) => {
@@ -146,7 +116,7 @@ export default function Alerts({ token }) {
         <select
           className="bg-[#21242B] rounded-lg px-3 py-2 border border-[#343741] text-white text-base font-semibold min-w-[140px] shadow-sm focus:outline-cyan-400"
           value={selectedCamera}
-          onChange={e => setSelectedCamera(Number(e.target.value))}
+          onChange={e => setSelectedCamera(e.target.value)}
           disabled={loadingCameras || cameras.length === 0}
         >
           <option value="">
