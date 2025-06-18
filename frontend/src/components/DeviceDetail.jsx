@@ -1,3 +1,5 @@
+// src/pages/DeviceDetail.jsx
+
 import React, { useEffect, useState } from "react";
 import ZoneCard from "./ZoneCard";
 import { fetchCameraStatus } from "../api";
@@ -33,10 +35,16 @@ export default function DeviceDetail({
     setError("");
     setData(null);
 
-    fetchCameraStatus(cameraId, token, safeDesde.toISOString(), safeHasta.toISOString())
+    fetchCameraStatus(
+      cameraId,
+      token,
+      safeDesde.toISOString(),
+      safeHasta.toISOString()
+    )
       .then((resp) => setData(resp))
       .catch((err) => {
-        let msg = err.message || "No se pudieron cargar los datos del dispositivo.";
+        let msg =
+          err.message || "No se pudieron cargar los datos del dispositivo.";
         setError(msg);
         setData(null);
       })
