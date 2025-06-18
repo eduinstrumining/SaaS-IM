@@ -25,16 +25,12 @@ export default function ZoneChart({ history, rango = "24" }) {
     );
   }
 
-  // Filtrado ultra-dinámico: solo temperaturas numéricas válidas
   const filtered = history.filter(
     (p) =>
       typeof p.temperature === "number" &&
       isFinite(p.temperature)
   );
 
-  const temps = filtered.map(point => point.temperature);
-
-  // Si hay menos de 2 puntos no tiene sentido graficar
   if (filtered.length < 2) {
     return (
       <div className="h-32 w-full bg-gradient-to-b from-flowforge-border to-flowforge-dark rounded-2xl flex items-center justify-center opacity-50">
@@ -43,43 +39,23 @@ export default function ZoneChart({ history, rango = "24" }) {
     );
   }
 
-  // Etiquetas eje X dinámicas
-  let labels, xScale;
-  if (Number(rango) >= 24) {
-    labels = filtered.map(point => new Date(point.timestamp));
-    xScale = {
-      type: "time",
-      time: {
-        unit: Number(rango) >= 168 ? "day" : "hour",
-        tooltipFormat: "dd/MM/yyyy HH:mm",
-        displayFormats: {
-          hour: "dd/MM HH:mm",
-          day: "dd/MM",
-        },
-      },
-      grid: { display: false },
-      ticks: {
-        color: "#8C92A4",
-        font: { size: 12, family: "Inter, ui-sans-serif" },
-        maxTicksLimit: 6,
-      }
-    };
-  } else {
-    labels = filtered.map(point =>
-      point.timestamp
-        ? new Date(point.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-        : ""
-    );
-    xScale = {
-      type: "category",
-      grid: { display: false },
-      ticks: {
-        color: "#8C92A4",
-        font: { size: 12, family: "Inter, ui-sans-serif" },
-        maxTicksLimit: 6,
-      }
-    };
+  // Calcula el rango real de fechas (en días)
+  const minTs = Math.min(...filtered.map(p => new Date(p.timestamp).getTime()));
+  const maxTs = Math.max(...filtered.map(p => new Date(p.timestamp).getTime()));
+  const days = Math.round((maxTs - minTs) / (1000 * 60 * 60 * 24)) + 1;
+
+  // Ajusta la unidad del eje X según los días del rango
+  let xUnit = "hour";
+  let tooltipFmt = "dd/MM/yyyy HH:mm";
+  let displayFmt = { hour: "HH:mm" };
+  if (days >= 2) {
+    xUnit = "day";
+    tooltipFmt = "dd/MM/yyyy";
+    displayFmt = { day: "dd/MM" };
   }
+
+  const labels = filtered.map(point => new Date(point.timestamp));
+  const temps = filtered.map(point => point.temperature);
 
   const data = {
     labels,
@@ -116,10 +92,30 @@ export default function ZoneChart({ history, rango = "24" }) {
         borderWidth: 1,
         padding: 10,
         caretSize: 8,
+        callbacks: {
+          // Muestra fecha y hora en el tooltip si el rango es mayor a 1 día
+          title: (items) =>
+            xUnit === "day"
+              ? items[0].label
+              : items[0].label,
+        },
       },
     },
     scales: {
-      x: xScale,
+      x: {
+        type: "time",
+        time: {
+          unit: xUnit,
+          tooltipFormat: tooltipFmt,
+          displayFormats: displayFmt,
+        },
+        grid: { display: false },
+        ticks: {
+          color: "#8C92A4",
+          font: { size: 12, family: "Inter, ui-sans-serif" },
+          maxTicksLimit: 7,
+        }
+      },
       y: {
         display: false,
         grid: { display: false },
