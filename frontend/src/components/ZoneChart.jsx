@@ -16,7 +16,7 @@ import 'chartjs-adapter-date-fns';
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, TimeScale, Filler, Tooltip, Legend);
 
-export default function ZoneChart({ history, rango = "24" }) {
+export default function ZoneChart({ history, desde, hasta }) {
   if (!Array.isArray(history) || history.length === 0) {
     return (
       <div className="h-32 w-full bg-gradient-to-b from-flowforge-border to-flowforge-dark rounded-2xl flex items-center justify-center opacity-50">
@@ -30,29 +30,26 @@ export default function ZoneChart({ history, rango = "24" }) {
       typeof p.temperature === "number" &&
       isFinite(p.temperature)
   );
-
   if (filtered.length < 2) {
     return (
       <div className="h-32 w-full bg-gradient-to-b from-flowforge-border to-flowforge-dark rounded-2xl flex items-center justify-center opacity-50">
-        <span className="text-[#70F3FF]">No hay suficientes datos en el rango seleccionado</span>
+        <span className="text-[#70F3FF]">No hay suficientes datos</span>
       </div>
     );
   }
 
-  // Calcula el rango real de fechas (en días)
-  const minTs = Math.min(...filtered.map(p => new Date(p.timestamp).getTime()));
-  const maxTs = Math.max(...filtered.map(p => new Date(p.timestamp).getTime()));
-  const days = Math.round((maxTs - minTs) / (1000 * 60 * 60 * 24)) + 1;
-
-  // Ajusta la unidad del eje X según los días del rango
-  let xUnit = "hour";
-  let tooltipFmt = "dd/MM/yyyy HH:mm";
-  let displayFmt = { hour: "HH:mm" };
-  if (days >= 2) {
-    xUnit = "day";
-    tooltipFmt = "dd/MM/yyyy";
-    displayFmt = { day: "dd/MM" };
+  // Calcula el rango en días, usando los props desde/hasta SIEMPRE
+  let days = 1;
+  if (desde && hasta) {
+    const d1 = new Date(desde).getTime();
+    const d2 = new Date(hasta).getTime();
+    days = Math.round(Math.abs(d2 - d1) / (1000 * 60 * 60 * 24));
   }
+
+  // Si el rango es más de 2 días, usa unit: "day"
+  const xUnit = days >= 2 ? "day" : "hour";
+  const tooltipFmt = days >= 2 ? "dd/MM/yyyy" : "dd/MM/yyyy HH:mm";
+  const displayFmt = days >= 2 ? { day: "dd/MM" } : { hour: "HH:mm" };
 
   const labels = filtered.map(point => new Date(point.timestamp));
   const temps = filtered.map(point => point.temperature);
@@ -93,11 +90,7 @@ export default function ZoneChart({ history, rango = "24" }) {
         padding: 10,
         caretSize: 8,
         callbacks: {
-          // Muestra fecha y hora en el tooltip si el rango es mayor a 1 día
-          title: (items) =>
-            xUnit === "day"
-              ? items[0].label
-              : items[0].label,
+          title: (items) => items[0].label,
         },
       },
     },
@@ -113,7 +106,7 @@ export default function ZoneChart({ history, rango = "24" }) {
         ticks: {
           color: "#8C92A4",
           font: { size: 12, family: "Inter, ui-sans-serif" },
-          maxTicksLimit: 7,
+          maxTicksLimit: days >= 2 ? Math.min(days, 8) : 6,
         }
       },
       y: {

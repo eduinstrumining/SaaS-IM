@@ -174,7 +174,7 @@ export default function DeviceDetail({
                 key={z.zone_id}
                 zone={z}
                 zoneLabel={z.zone_id}
-                desde={safeDesde.toISOString()}
+                desde={safeDesde.toISOString()} // <-- clave para los gráficos
                 hasta={safeHasta.toISOString()}
                 showSelect={false}
               />
