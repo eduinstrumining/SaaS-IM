@@ -15,7 +15,6 @@ import {
 } from "chart.js";
 import "chartjs-adapter-date-fns";
 
-// Registra componentes de ChartJS
 ChartJS.register(
   LineElement,
   CategoryScale,
@@ -41,19 +40,16 @@ function getPercentile(arr, p) {
   return sorted[idx];
 }
 
-// Nuevo: agrega puntos vacíos para mostrar el eje X completo
 function fillTimeRange(readings, desde, hasta) {
   const points = [...readings];
   if (desde) {
     const desdeDate = new Date(desde);
-    // Si el primer dato está después del inicio, inyecta un punto vacío
     if (!points.length || new Date(points[0].timestamp) > desdeDate) {
       points.unshift({ timestamp: desdeDate.toISOString(), temperature: null });
     }
   }
   if (hasta) {
     const hastaDate = new Date(hasta);
-    // Si el último dato está antes del final, inyecta un punto vacío
     if (!points.length || new Date(points[points.length - 1].timestamp) < hastaDate) {
       points.push({ timestamp: hastaDate.toISOString(), temperature: null });
     }
@@ -82,10 +78,8 @@ export default function ZoneCard({
       )
     : [];
 
-  // --- AQUI agregamos los puntos extremos ---
   const displayReadings = downsample(fillTimeRange(validReadings, desde, hasta), 1000);
 
-  // Data series y labels eje X
   const temps = displayReadings.map((r) => r.temperature === null ? null : Number(r.temperature));
   const timeLabels = displayReadings.map((r) => new Date(r.timestamp));
 
@@ -103,7 +97,6 @@ export default function ZoneCard({
     yMax = Math.min(yMax + 2, maxSafeTemp);
   }
 
-  // Variación porcentual en periodo seleccionado
   let variation = 0;
   if (filteredTemps.length >= 2 && filteredTemps[0] !== 0) {
     variation = Math.round(
@@ -111,7 +104,15 @@ export default function ZoneCard({
     );
   }
 
-  // DATASET CHART.JS
+  // --------- INICIO CAMBIO: cálculo rango de días ---------
+  const msPorDia = 24 * 60 * 60 * 1000;
+  const desdeDate = desde ? new Date(desde) : null;
+  const hastaDate = hasta ? new Date(hasta) : null;
+  const diffDias = (desdeDate && hastaDate)
+    ? Math.ceil((hastaDate - desdeDate) / msPorDia)
+    : 1;
+  // --------- FIN CAMBIO ---------
+
   const chartData = {
     labels: timeLabels,
     datasets: [
@@ -125,12 +126,12 @@ export default function ZoneCard({
         pointRadius: 0,
         borderWidth: 3,
         cubicInterpolationMode: "monotone",
-        spanGaps: true, // <-- Importante para que Chart.js muestre saltos en los huecos
+        spanGaps: true,
       },
     ],
   };
 
-  // Chart Options
+  // --------- INICIO CAMBIO EN chartOptions ---------
   const chartOptions = {
     plugins: {
       legend: { display: false },
@@ -147,8 +148,8 @@ export default function ZoneCard({
       x: {
         type: "time",
         time: {
-          unit: "hour",
-          tooltipFormat: "dd/MM/yyyy HH:mm",
+          unit: diffDias >= 2 ? "day" : "hour",
+          tooltipFormat: diffDias >= 2 ? "dd/MM/yyyy" : "dd/MM/yyyy HH:mm",
           displayFormats: {
             hour: "HH:mm",
             day: "dd/MM",
@@ -160,7 +161,7 @@ export default function ZoneCard({
         ticks: {
           color: "#8C92A4",
           font: { size: 11, family: "Inter, sans-serif" },
-          maxTicksLimit: 8,
+          maxTicksLimit: diffDias >= 2 ? 8 : 12,
         },
       },
       y: {
@@ -186,8 +187,8 @@ export default function ZoneCard({
     responsive: true,
     maintainAspectRatio: false,
   };
+  // --------- FIN CAMBIO ---------
 
-  // Fechas del rango visual (UI)
   let desdeStr = desde ? new Date(desde).toLocaleString("es-CL") : "";
   let hastaStr = hasta ? new Date(hasta).toLocaleString("es-CL") : "";
 
