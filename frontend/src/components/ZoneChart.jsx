@@ -34,60 +34,47 @@ export default function ZoneChart({ history, rango = "24" }) {
     );
   }
 
-  // 2. Filtrado ultra-dinámico: solo temperaturas numéricas y no atípicas (opcional)
+  // 2. Filtrado de datos
   const filtered = history.filter(
     (p) =>
       typeof p.temperature === "number" &&
-      isFinite(p.temperature)
+      isFinite(p.temperature) &&
+      !!p.timestamp // asegúrate que tenga timestamp válido
   );
 
-  const temps = filtered.map(point => point.temperature);
+  // 3. Formato para Chart.js: [{x, y}]
+  const chartData = filtered.map(point => ({
+    x: new Date(point.timestamp),
+    y: point.temperature
+  }));
 
-  // 3. Etiquetas eje X: siempre dinámicas según rango
-  let labels, xScale;
-  if (Number(rango) >= 24) {
-    labels = filtered.map(point => new Date(point.timestamp));
-    xScale = {
-      type: "time",
-      time: {
-        unit: Number(rango) >= 168 ? "day" : "hour",
-        tooltipFormat: "dd/MM/yyyy HH:mm",
-        displayFormats: {
-          hour: "HH:mm",
-          day: "dd/MM"
-        }
-      },
-      grid: { display: false },
-      ticks: {
-        color: "#8C92A4",
-        font: { size: 12, family: "Inter, ui-sans-serif" },
-        maxTicksLimit: 6,
+  // 4. Opciones de eje X: time, días si el rango es >=48h
+  const isMultiDay = Number(rango) >= 48;
+  const xScale = {
+    type: "time",
+    time: {
+      unit: isMultiDay ? "day" : "hour",
+      tooltipFormat: "dd/MM/yyyy HH:mm",
+      displayFormats: {
+        hour: "HH:mm",
+        day: "dd/MM"
       }
-    };
-  } else {
-    labels = filtered.map(point =>
-      point.timestamp
-        ? new Date(point.timestamp).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
-        : ""
-    );
-    xScale = {
-      type: "category",
-      grid: { display: false },
-      ticks: {
-        color: "#8C92A4",
-        font: { size: 12, family: "Inter, ui-sans-serif" },
-        maxTicksLimit: 6,
-      }
-    };
-  }
+    },
+    grid: { display: false },
+    ticks: {
+      color: "#8C92A4",
+      font: { size: 12, family: "Inter, ui-sans-serif" },
+      maxTicksLimit: isMultiDay ? 8 : 10,
+      autoSkip: true,
+    }
+  };
 
-  // 4. Data y opciones del gráfico: siempre dinámico según el dataset
+  // 5. Data y opciones del gráfico
   const data = {
-    labels,
     datasets: [
       {
         label: "Temperatura",
-        data: temps,
+        data: chartData,
         fill: true,
         tension: 0.45,
         borderColor: "#70F3FF",

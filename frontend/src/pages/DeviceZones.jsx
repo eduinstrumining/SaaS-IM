@@ -1,3 +1,4 @@
+// src/pages/DeviceZones.jsx
 import React, { useEffect, useState, useContext } from "react";
 import { fetchCameras, fetchCameraZones } from "../api";
 import Thermometer from "../components/Thermometer";
@@ -5,9 +6,9 @@ import { AuthContext } from "../context/AuthContext";
 
 // Utilidad para localStorage (umbral máximo por zona)
 const getUserMaxTemp = (cameraId, zoneId) => {
-  const key = `zone_max_${cameraId}_${zone_id}`;
+  const key = `zone_max_${cameraId}_${zoneId}`; // ← ¡CORREGIDO!
   const v = window.localStorage.getItem(key);
-  return v ? parseFloat(v) : 40;
+  return v ? parseFloat(v) : 40; // Valor por defecto: 40°C
 };
 const setUserMaxTemp = (cameraId, zoneId, value) => {
   const key = `zone_max_${cameraId}_${zoneId}`;
