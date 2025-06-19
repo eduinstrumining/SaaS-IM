@@ -1,4 +1,6 @@
-const API_BASE =
+// src/api.js
+
+export const API_BASE =
   import.meta.env.VITE_API_BASE ||
   process.env.REACT_APP_API_BASE ||
   "http://localhost:5000/api";
@@ -31,6 +33,7 @@ export async function fetchZonesByCamera(cameraId, token) {
   if (!res.ok) throw new Error("Error al obtener zonas");
   return await res.json();
 }
+export const fetchCameraZones = fetchZonesByCamera; // alias para legacy
 
 // --- STATUS HISTÓRICO (para gráficos, rango de fechas, detalle) ---
 export async function fetchCameraStatus(cameraId, token, desde, hasta) {
