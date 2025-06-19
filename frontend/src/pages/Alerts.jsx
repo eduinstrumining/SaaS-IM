@@ -1,6 +1,6 @@
 // src/pages/Alerts.jsx
 import React, { useState, useEffect } from "react";
-import { fetchCameras, fetchCameraZones, createZoneAlert } from "../api";
+import { fetchCameras, fetchZonesByCamera, createZoneAlert } from "../api";
 
 // =================== COMPONENT ====================
 export default function Alerts({ token }) {
@@ -40,7 +40,7 @@ export default function Alerts({ token }) {
       setZoneConfigs({});
       return;
     }
-    fetchCameraZones(Number(selectedCamera), token)
+    fetchZonesByCamera(Number(selectedCamera), token)
       .then((data) => {
         let zonasArr = Array.isArray(data.zonas) ? data.zonas : data;
         if (zonasArr.length > 0 && typeof zonasArr[0] === "number") {
@@ -91,7 +91,7 @@ export default function Alerts({ token }) {
     try {
       await createZoneAlert(
         {
-          zone_id: String(zoneId), // 👈 CORREGIDO: siempre string para el backend Go
+          zone_id: String(zoneId),
           upper_thresh: Number(cfg.upper),
           lower_thresh: Number(cfg.lower),
           recipient: correo,
