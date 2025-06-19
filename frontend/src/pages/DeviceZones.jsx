@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { fetchCameraSummary } from "../api";
-import ZoneCard from "./ZoneCard";
+import ZoneCard from "../components/ZoneCard"; // ¡Importación correcta!
 
 function getZoneStatus(lastTime) {
   if (!lastTime) {
@@ -88,46 +88,20 @@ export default function DeviceZones({ cameraId, token }) {
       {zonas.map((z) => {
         const { estado, ultimo, color } = getZoneStatus(z.last_time);
         return (
-          <div
+          <ZoneCard
             key={z.zone_id}
-            className="bg-flowforge-panel rounded-2xl p-6 shadow flex flex-col gap-4"
-          >
-            <h2 className="text-xl font-bold">{`Zona ${z.zone_id}`}</h2>
-            <div className="flex items-center gap-4">
-              <div className="text-4xl font-bold text-white">
-                {z.last_temp !== undefined && z.last_temp !== null
-                  ? `${Math.round(z.last_temp)}°C`
-                  : "--"}
-              </div>
-              <span
-                className={`inline-block px-4 py-1 rounded-xl font-bold text-xs`}
-                style={{
-                  color:
-                    color === "green"
-                      ? "#34d399"
-                      : color === "orange"
-                      ? "#f59e42"
-                      : color === "red"
-                      ? "#ef4444"
-                      : "#8C92A4",
-                  background:
-                    color === "gray"
-                      ? "#22252B"
-                      : color === "green"
-                      ? "#132817"
-                      : color === "orange"
-                      ? "#2d2110"
-                      : "#220e0e",
-                }}
-              >
-                {estado}
-              </span>
-              <span className="ml-2 text-xs text-[#8C92A4]">
-                {ultimo ? `(${tiempoDesde(ultimo)})` : ""}
-              </span>
-            </div>
-            {/* Aquí puedes agregar más detalles o un gráfico histórico si el usuario lo solicita */}
-          </div>
+            zone={{
+              zone_id: z.zone_id,
+              readings: [
+                {
+                  temperature: z.last_temp,
+                  timestamp: z.last_time,
+                },
+              ],
+            }}
+            zoneLabel={z.zone_id}
+            showSelect={false}
+          />
         );
       })}
     </div>

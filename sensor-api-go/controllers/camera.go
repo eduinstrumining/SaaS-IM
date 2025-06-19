@@ -10,6 +10,48 @@ import (
 	"gorm.io/gorm"
 )
 
+// --- HANDLER: Traer lecturas de cámaras (clásico) ---
+func GetCameraReadings(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var readings []models.CameraReading
+		if err := db.Find(&readings).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "No se pudieron obtener las lecturas"})
+			return
+		}
+		c.JSON(http.StatusOK, readings)
+	}
+}
+
+// --- HANDLER: Listar cámaras únicas ---
+func ListUniqueCameras(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var cameraIDs []int
+		if err := db.Raw("SELECT DISTINCT camera_id FROM camera_readings").Scan(&cameraIDs).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "No se pudieron obtener las cámaras"})
+			return
+		}
+		c.JSON(http.StatusOK, cameraIDs)
+	}
+}
+
+// --- HANDLER: Listar zonas por cámara ---
+func ListZonasByCamera(db *gorm.DB) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		cameraID, err := strconv.Atoi(c.Param("camera_id"))
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "camera_id inválido"})
+			return
+		}
+		var zonas []int
+		if err := db.Raw("SELECT DISTINCT zone_id FROM camera_readings WHERE camera_id = ?", cameraID).Scan(&zonas).Error; err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "No se pudieron obtener las zonas"})
+			return
+		}
+		c.JSON(http.StatusOK, zonas)
+	}
+}
+
+// --- NUEVO: Dashboard resumen rápido ---
 type ZoneStatus struct {
 	ZoneID   int                    `json:"zone_id"`
 	LastTemp *float64               `json:"last_temp,omitempty"`
@@ -23,12 +65,9 @@ type CameraDashboard struct {
 	Zonas    []ZoneStatus `json:"zonas"`
 }
 
-// Parámetros de temperatura aceptable (ajusta si es necesario)
 const minTemp = 5.0
 const maxTemp = 45.0
 
-// --- Nuevo endpoint: dashboard resumen rápido ---
-// GET /api/cameras/:camera_id/summary
 func CameraSummaryDashboard(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cameraID, err := strconv.Atoi(c.Param("camera_id"))
@@ -36,7 +75,6 @@ func CameraSummaryDashboard(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "camera_id inválido"})
 			return
 		}
-		// Trae zonas únicas de esa cámara
 		var zonas []int
 		err = db.Raw(`
             SELECT DISTINCT zone_id 
@@ -50,7 +88,6 @@ func CameraSummaryDashboard(db *gorm.DB) gin.HandlerFunc {
 		}
 		zonasStatus := make([]ZoneStatus, 0, len(zonas))
 		for _, z := range zonas {
-			// Solo la última lectura válida
 			var last models.CameraReading
 			db.Where("camera_id = ? AND zone_id = ?", cameraID, z).
 				Order("timestamp DESC").
@@ -71,7 +108,7 @@ func CameraSummaryDashboard(db *gorm.DB) gin.HandlerFunc {
 				LastTemp: lastTemp,
 				LastTime: lastTime,
 				State:    state,
-				Readings: nil, // no envía históricos aquí
+				Readings: nil,
 			})
 		}
 		resp := CameraDashboard{
@@ -82,8 +119,7 @@ func CameraSummaryDashboard(db *gorm.DB) gin.HandlerFunc {
 	}
 }
 
-// --- Endpoint existente: dashboard con históricos ---
-// GET /api/cameras/:camera_id/status?desde=...&hasta=...
+// --- Dashboard histórico con rango de fechas ---
 func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		cameraID, err := strconv.Atoi(c.Param("camera_id"))
@@ -91,7 +127,6 @@ func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "camera_id inválido"})
 			return
 		}
-		// Parámetros de rango
 		desdeStr := c.Query("desde")
 		hastaStr := c.Query("hasta")
 		var desde, hasta time.Time
@@ -105,7 +140,6 @@ func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
 		} else {
 			hasta = time.Now()
 		}
-		// Trae zonas únicas de esa cámara
 		var zonas []int
 		err = db.Raw(`
             SELECT DISTINCT zone_id 
@@ -119,7 +153,6 @@ func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
 		}
 		zonasStatus := make([]ZoneStatus, 0, len(zonas))
 		for _, z := range zonas {
-			// Todas las lecturas en el rango
 			var readings []models.CameraReading
 			db.Where("camera_id = ? AND zone_id = ? AND timestamp >= ? AND timestamp <= ?", cameraID, z, desde, hasta).
 				Order("timestamp").
@@ -142,7 +175,7 @@ func CameraStatusDashboard(db *gorm.DB) gin.HandlerFunc {
 				LastTemp: lastTemp,
 				LastTime: lastTime,
 				State:    state,
-				Readings: readings, // históricos para los gráficos
+				Readings: readings,
 			})
 		}
 		resp := CameraDashboard{
