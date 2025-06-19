@@ -76,13 +76,13 @@ function tiempoDesde(date) {
   if (!date) return "";
   const now = new Date();
   const diffSec = Math.floor((now - date) / 1000);
-  if (diffSec < 60) return `hace ${diffSec}s`;
+  if (diffSec < 60) return hace ${diffSec}s;
   const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `hace ${diffMin}min`;
+  if (diffMin < 60) return hace ${diffMin}min;
   const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `hace ${diffHr}h`;
+  if (diffHr < 24) return hace ${diffHr}h;
   const diffDay = Math.floor(diffHr / 24);
-  return `hace ${diffDay}d`;
+  return hace ${diffDay}d;
 }
 
 export default function ZoneCard({
@@ -144,7 +144,7 @@ export default function ZoneCard({
     labels: timeLabels,
     datasets: [
       {
-        label: `Temperatura zona ${zoneLabel}`,
+        label: Temperatura zona ${zoneLabel},
         data: temps,
         fill: true,
         tension: 0.48,
@@ -166,7 +166,7 @@ export default function ZoneCard({
         intersect: false,
         callbacks: {
           label: (context) =>
-            context.parsed.y !== null ? `${context.parsed.y}°C` : "Sin datos",
+            context.parsed.y !== null ? ${context.parsed.y}°C : "Sin datos",
         },
       },
     },
@@ -246,7 +246,7 @@ export default function ZoneCard({
   return (
     <div className="bg-flowforge-panel rounded-2xl p-6 shadow flex flex-col gap-4">
       <div className="flex items-center gap-4 mb-2">
-        <h2 className="text-xl font-bold">{`Zona ${zoneLabel}`}</h2>
+        <h2 className="text-xl font-bold">{Zona ${zoneLabel}}</h2>
         <span
           className="inline-block px-4 py-1 rounded-xl font-bold text-xs"
           style={{
@@ -271,24 +271,24 @@ export default function ZoneCard({
           {estado}
         </span>
         <span className="ml-2 text-xs text-[#8C92A4]">
-          {ultimo ? `(${tiempoDesde(ultimo)})` : ""}
+          {ultimo ? (${tiempoDesde(ultimo)}) : ""}
         </span>
       </div>
       <div className="flex flex-col md:flex-row items-end md:items-center gap-8">
         <div>
           <div className="text-4xl font-bold text-white">
             {filteredTemps.length
-              ? `${Math.round(filteredTemps[filteredTemps.length - 1])}°C`
+              ? ${Math.round(filteredTemps[filteredTemps.length - 1])}°C
               : "--"}
           </div>
           <div
-            className={`text-xs mt-1 font-semibold ${
+            className={text-xs mt-1 font-semibold ${
               variation > 0
                 ? "text-green-400"
                 : variation < 0
                 ? "text-red-400"
                 : "text-[#8C92A4]"
-            }`}
+            }}
           >
             Periodo seleccionado {variation > 0 ? "+" : ""}
             {variation}%
