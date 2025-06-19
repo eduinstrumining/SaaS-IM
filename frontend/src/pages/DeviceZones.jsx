@@ -1,165 +1,135 @@
 // src/pages/DeviceZones.jsx
-import React, { useEffect, useState, useContext } from "react";
-import { fetchCameras, fetchCameraZones } from "../api";
-import Thermometer from "../components/Thermometer";
-import { AuthContext } from "../context/AuthContext";
 
-// Utilidad para localStorage (umbral máximo por zona)
-const getUserMaxTemp = (cameraId, zoneId) => {
-  const key = `zone_max_${cameraId}_${zoneId}`; // ← ¡CORREGIDO!
-  const v = window.localStorage.getItem(key);
-  return v ? parseFloat(v) : 40; // Valor por defecto: 40°C
-};
-const setUserMaxTemp = (cameraId, zoneId, value) => {
-  const key = `zone_max_${cameraId}_${zoneId}`;
-  window.localStorage.setItem(key, value);
-};
+import React, { useEffect, useState } from "react";
+import { fetchCameraSummary } from "../api";
+import ZoneCard from "./ZoneCard";
 
-export default function DeviceZones() {
-  const { token } = useContext(AuthContext);
-  const [cameras, setCameras] = useState([]);
-  const [selectedCamera, setSelectedCamera] = useState(null);
+function getZoneStatus(lastTime) {
+  if (!lastTime) {
+    return { estado: "Nunca", ultimo: null, color: "gray" };
+  }
+  const lastDate = new Date(lastTime);
+  const now = new Date();
+  const diffMin = (now - lastDate) / 1000 / 60;
+  if (diffMin < 2) return { estado: "OK", ultimo: lastDate, color: "green" };
+  if (diffMin < 10) return { estado: "Retraso", ultimo: lastDate, color: "orange" };
+  return { estado: "Offline", ultimo: lastDate, color: "red" };
+}
+
+function tiempoDesde(date) {
+  if (!date) return "";
+  const now = new Date();
+  const diffSec = Math.floor((now - date) / 1000);
+  if (diffSec < 60) return `hace ${diffSec}s`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `hace ${diffMin}min`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `hace ${diffHr}h`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `hace ${diffDay}d`;
+}
+
+export default function DeviceZones({ cameraId, token }) {
   const [zonas, setZonas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [editMax, setEditMax] = useState({});
-  const [maxVals, setMaxVals] = useState({});
+  const [error, setError] = useState("");
 
-  // Trae cámaras una vez por token
   useEffect(() => {
+    if (!cameraId || !token) return;
     setLoading(true);
-    fetchCameras(token)
-      .then((cams) => {
-        setCameras(cams);
-        setSelectedCamera(cams?.[0]?.camera_id ?? null);
+    setError("");
+    fetchCameraSummary(cameraId, token)
+      .then((data) => {
+        setZonas(data.zonas || []);
+        setError("");
+      })
+      .catch((err) => {
+        setError(
+          err.message ||
+            "No se pudieron cargar las zonas de la cámara."
+        );
       })
       .finally(() => setLoading(false));
-  }, [token]);
+  }, [cameraId, token]);
 
-  // Trae zonas y refresca automáticamente cada 8 segundos
-  useEffect(() => {
-    let intervalId;
-    const fetchZonas = () => {
-      if (!selectedCamera) return;
-      setLoading(true);
-      fetchCameraZones(selectedCamera, token)
-        .then((data) => {
-          setZonas(data.zonas || []);
-          const newMax = {};
-          (data.zonas || []).forEach(z => {
-            newMax[z.zone_id] = getUserMaxTemp(selectedCamera, z.zone_id);
-          });
-          setMaxVals(newMax);
-        })
-        .finally(() => setLoading(false));
-    };
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-[#8C92A4] text-sm">
+        <span className="animate-spin h-4 w-4 inline-block border-2 border-flowforge-accent border-t-transparent rounded-full"></span>
+        Cargando...
+      </div>
+    );
+  }
 
-    fetchZonas();
-    intervalId = setInterval(fetchZonas, 8000); // cada 8 segundos
+  if (error) {
+    return (
+      <div className="text-red-400 flex items-center gap-4">
+        {error}
+        <button
+          onClick={() => window.location.reload()}
+          className="ml-4 px-3 py-1 bg-[#2D3748] rounded text-white text-xs font-semibold hover:bg-[#70F3FF] hover:text-black transition"
+        >
+          Reintentar
+        </button>
+      </div>
+    );
+  }
 
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [selectedCamera, token]);
-
-  const handleMaxChange = (zoneId, val) => {
-    setMaxVals(v => ({ ...v, [zoneId]: val }));
-    setUserMaxTemp(selectedCamera, zoneId, val);
-  };
+  if (!zonas.length) {
+    return (
+      <div className="bg-flowforge-panel text-[#8C92A4] text-center py-10 rounded-2xl mb-8">
+        No existen zonas registradas para esta cámara.
+      </div>
+    );
+  }
 
   return (
-    <main className="max-w-6xl mx-auto py-10 px-4">
-      <h1 className="text-2xl font-bold mb-6">Monitoreo de Zonas por Temperatura</h1>
-      <div className="flex gap-6 mb-8 items-center">
-        <span className="text-[#8C92A4] font-semibold text-sm">Selecciona cámara:</span>
-        <select
-          className="bg-flowforge-panel text-white border border-flowforge-border rounded-lg px-3 py-2"
-          value={selectedCamera || ""}
-          onChange={e => setSelectedCamera(Number(e.target.value))}
-          disabled={cameras.length === 0}
-        >
-          {cameras.map((cam) => (
-            <option key={cam.camera_id} value={cam.camera_id}>
-              Cámara {cam.camera_id}
-            </option>
-          ))}
-        </select>
-      </div>
-      {loading && <div className="text-[#8C92A4]">Cargando...</div>}
-      {!loading && zonas.length === 0 && (
-        <div className="text-[#8C92A4]">No hay zonas para esta cámara.</div>
-      )}
-      <div className="flex flex-wrap gap-6">
-        {zonas.map(zona => (
+    <div className="grid gap-8">
+      {zonas.map((z) => {
+        const { estado, ultimo, color } = getZoneStatus(z.last_time);
+        return (
           <div
-            key={zona.zone_id}
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              background: "#23243a",
-              borderRadius: "2rem",
-              boxShadow: "0 6px 32px rgba(0,0,0,0.4)",
-              padding: "16px 10px",
-              minWidth: 150
-            }}
+            key={z.zone_id}
+            className="bg-flowforge-panel rounded-2xl p-6 shadow flex flex-col gap-4"
           >
-            <Thermometer
-              currentTemp={zona.last_temp ?? null}
-              userMax={maxVals[zona.zone_id] ?? 40}
-              zoneName={zona.name || `Zona ${zona.zone_id}`}
-            />
-            <div style={{ marginTop: 8 }}>
-              {editMax[zona.zone_id] ? (
-                <div>
-                  <input
-                    type="number"
-                    value={maxVals[zona.zone_id] ?? 40}
-                    min={10}
-                    max={150}
-                    step={0.1}
-                    style={{
-                      width: 64,
-                      padding: "4px 8px",
-                      borderRadius: 8,
-                      background: "#191B22",
-                      color: "#fff",
-                      border: "1px solid #2D3A4C"
-                    }}
-                    onChange={e => handleMaxChange(zona.zone_id, parseFloat(e.target.value))}
-                  />{" "}
-                  <button
-                    style={{
-                      background: "#18B6FF",
-                      color: "#fff",
-                      borderRadius: 8,
-                      border: "none",
-                      padding: "4px 8px",
-                      cursor: "pointer"
-                    }}
-                    onClick={() => setEditMax(m => ({ ...m, [zona.zone_id]: false }))}
-                  >
-                    OK
-                  </button>
-                </div>
-              ) : (
-                <button
-                  style={{
-                    background: "#444A",
-                    color: "#18B6FF",
-                    borderRadius: 8,
-                    border: "none",
-                    padding: "4px 12px",
-                    cursor: "pointer"
-                  }}
-                  onClick={() => setEditMax(m => ({ ...m, [zona.zone_id]: true }))}
-                >
-                  Editar máx
-                </button>
-              )}
+            <h2 className="text-xl font-bold">{`Zona ${z.zone_id}`}</h2>
+            <div className="flex items-center gap-4">
+              <div className="text-4xl font-bold text-white">
+                {z.last_temp !== undefined && z.last_temp !== null
+                  ? `${Math.round(z.last_temp)}°C`
+                  : "--"}
+              </div>
+              <span
+                className={`inline-block px-4 py-1 rounded-xl font-bold text-xs`}
+                style={{
+                  color:
+                    color === "green"
+                      ? "#34d399"
+                      : color === "orange"
+                      ? "#f59e42"
+                      : color === "red"
+                      ? "#ef4444"
+                      : "#8C92A4",
+                  background:
+                    color === "gray"
+                      ? "#22252B"
+                      : color === "green"
+                      ? "#132817"
+                      : color === "orange"
+                      ? "#2d2110"
+                      : "#220e0e",
+                }}
+              >
+                {estado}
+              </span>
+              <span className="ml-2 text-xs text-[#8C92A4]">
+                {ultimo ? `(${tiempoDesde(ultimo)})` : ""}
+              </span>
             </div>
+            {/* Aquí puedes agregar más detalles o un gráfico histórico si el usuario lo solicita */}
           </div>
-        ))}
-      </div>
-    </main>
+        );
+      })}
+    </div>
   );
 }

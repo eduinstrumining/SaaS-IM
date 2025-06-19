@@ -1,76 +1,57 @@
-// src/api.js
+const API_BASE =
+  import.meta.env.VITE_API_BASE ||
+  process.env.REACT_APP_API_BASE ||
+  "http://localhost:5000/api";
 
-// Determina la base de la API correctamente en todos los entornos
-export const API_BASE =
-  (typeof import.meta !== "undefined" &&
-    import.meta.env &&
-    import.meta.env.VITE_API_URL &&
-    import.meta.env.VITE_API_URL !== "")
-    ? import.meta.env.VITE_API_URL
-    : (typeof window !== "undefined" && window.API_BASE_URL ? window.API_BASE_URL : "http://localhost:5000/api");
-
-// Siempre loguea la base real usada
-try {
-  console.log("API Base URL:", API_BASE);
-} catch (_) {}
-
-// --- Empresas (COMPANIES) ---
-export async function fetchCompanies() {
-  const res = await fetch(`${API_BASE}/companies`);
-  if (!res.ok) throw new Error("No se pudieron obtener las empresas");
+// --- LOGIN ---
+export async function loginUser(email, password) {
+  const res = await fetch(`${API_BASE}/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new Error("Credenciales inválidas");
   return await res.json();
 }
 
-// --- Login (requiere companyId) ---
-export async function loginUser(email, password, companyId) {
-  const loginUrl = `${API_BASE}/login`;
-  const res = await fetch(loginUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password, company_id: companyId }),
-  });
-  if (!res.ok) {
-    let msg = "Login failed";
-    try {
-      const err = await res.json();
-      msg = err.error || msg;
-    } catch {}
-    throw new Error(msg);
-  }
-  const data = await res.json();
-  return data.token;
-}
-
-// --- Listar cámaras ---
+// --- LISTA DE CÁMARAS ---
 export async function fetchCameras(token) {
   const res = await fetch(`${API_BASE}/cameras`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) {
-    let msg = "Error al obtener cámaras";
-    try {
-      const err = await res.json();
-      if (err.error && err.error.includes("Token")) {
-        msg = "Tu sesión expiró. Por favor, inicia sesión nuevamente.";
-      } else if (err.error) {
-        msg = err.error;
-      }
-    } catch {}
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error("Error al obtener cámaras");
   return await res.json();
 }
 
-// --- Estado de cámara (zonas/histórico) ---
+// --- ZONAS POR CÁMARA ---
+export async function fetchZonesByCamera(cameraId, token) {
+  const res = await fetch(`${API_BASE}/cameras/${cameraId}/zonas`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Error al obtener zonas");
+  return await res.json();
+}
+
+// --- STATUS HISTÓRICO (para gráficos, rango de fechas, detalle) ---
 export async function fetchCameraStatus(cameraId, token, desde, hasta) {
-  const params = new URLSearchParams();
-  if (desde) params.append("desde", desde);
-  if (hasta) params.append("hasta", hasta);
-  const res = await fetch(`${API_BASE}/cameras/${cameraId}/status?${params}`, {
+  let url = `${API_BASE}/cameras/${cameraId}/status`;
+  if (desde && hasta) {
+    url += `?desde=${encodeURIComponent(desde)}&hasta=${encodeURIComponent(hasta)}`;
+  }
+  const res = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Error al obtener datos históricos de la cámara");
+  return await res.json();
+}
+
+// --- NUEVO: RESUMEN RÁPIDO PARA DASHBOARD ---
+export async function fetchCameraSummary(cameraId, token) {
+  const res = await fetch(`${API_BASE}/cameras/${cameraId}/summary`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
-    let msg = "Error al obtener datos de la cámara";
+    let msg = "Error al obtener el resumen de la cámara";
     try {
       const err = await res.json();
       if (err.error && err.error.includes("Token")) {
@@ -84,183 +65,130 @@ export async function fetchCameraStatus(cameraId, token, desde, hasta) {
   return await res.json();
 }
 
-// --- Zonas de una cámara (en tiempo real) ---
-export async function fetchCameraZones(cameraId, token) {
-  const res = await fetch(`${API_BASE}/cameras/${cameraId}/zonas`, {
-    headers: { Authorization: `Bearer ${token}` }
+// --- LISTA DE EMPRESAS ---
+export async function fetchCompanies(token) {
+  const res = await fetch(`${API_BASE}/companies`, {
+    headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) {
-    let msg = "Error al obtener zonas de la cámara";
-    try {
-      const err = await res.json();
-      msg = err.error || msg;
-    } catch {}
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error("Error al obtener empresas");
   return await res.json();
 }
 
-// --- Usuarios (para User Management) ---
+// --- USUARIOS ---
 export async function fetchUsers(token) {
   const res = await fetch(`${API_BASE}/users`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) {
-    let msg = "Error al obtener usuarios";
-    try {
-      const err = await res.json();
-      if (err.error && err.error.includes("Token")) {
-        msg = "Tu sesión expiró. Por favor, inicia sesión nuevamente.";
-      } else if (err.error) {
-        msg = err.error;
-      }
-    } catch {}
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error("Error al obtener usuarios");
   return await res.json();
 }
 
-// --- Crear usuario (para User Management) ---
-export async function createUser(userData, token) {
+export async function createUser(user, token) {
   const res = await fetch(`${API_BASE}/users`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(userData),
+    body: JSON.stringify(user),
   });
-  if (!res.ok) {
-    let msg = "No se pudo crear el usuario";
-    try {
-      const err = await res.json();
-      msg = err.error || msg;
-    } catch {}
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error("Error al crear usuario");
   return await res.json();
 }
 
-// --- Actualizar usuario ---
-export async function updateUser(userId, userData, token) {
-  const res = await fetch(`${API_BASE}/users/${userId}`, {
+// --- ALERTAS DE ZONA ---
+export async function fetchZoneAlerts(token) {
+  const res = await fetch(`${API_BASE}/zone-alerts`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Error al obtener alertas de zona");
+  return await res.json();
+}
+
+export async function createZoneAlert(alert, token) {
+  const res = await fetch(`${API_BASE}/zone-alerts`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(alert),
+  });
+  if (!res.ok) throw new Error("Error al crear alerta de zona");
+  return await res.json();
+}
+
+export async function updateZoneAlert(alertId, alert, token) {
+  const res = await fetch(`${API_BASE}/zone-alerts/${alertId}`, {
     method: "PUT",
     headers: {
+      Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify(userData),
+    body: JSON.stringify(alert),
   });
-  if (!res.ok) {
-    let msg = "Error al actualizar usuario";
-    try {
-      const err = await res.json();
-      msg = err.error || msg;
-    } catch {}
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error("Error al actualizar alerta de zona");
   return await res.json();
 }
 
-// --- Eliminar usuario ---
-export async function deleteUser(userId, token) {
-  const res = await fetch(`${API_BASE}/users/${userId}`, {
+export async function deleteZoneAlert(alertId, token) {
+  const res = await fetch(`${API_BASE}/zone-alerts/${alertId}`, {
     method: "DELETE",
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) {
-    let msg = "Error al eliminar usuario";
-    try {
-      const err = await res.json();
-      msg = err.error || msg;
-    } catch {}
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error("Error al eliminar alerta de zona");
   return await res.json();
 }
 
-// --- Alertas de dispositivos (Device Alerts) ---
+// --- ALERTAS DE DISPOSITIVO ---
 export async function fetchDeviceAlerts(token) {
   const res = await fetch(`${API_BASE}/device-alerts`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) {
-    let msg = "Error al obtener alertas de dispositivos";
-    try {
-      const err = await res.json();
-      if (err.error && err.error.includes("Token")) {
-        msg = "Tu sesión expiró. Por favor, inicia sesión nuevamente.";
-      } else if (err.error) {
-        msg = err.error;
-      }
-    } catch {}
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error("Error al obtener alertas de dispositivo");
   return await res.json();
 }
 
-// --- Crear alerta dispositivo (Device Alert) ---
-export async function createDeviceAlert(alertData, token) {
+export async function createDeviceAlert(alert, token) {
   const res = await fetch(`${API_BASE}/device-alerts`, {
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(alertData),
+    body: JSON.stringify(alert),
   });
-  if (!res.ok) {
-    let msg = "No se pudo crear la alerta de dispositivo";
-    try {
-      const err = await res.json();
-      msg = err.error || msg;
-    } catch {}
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error("Error al crear alerta de dispositivo");
   return await res.json();
 }
 
-// --- Crear alerta zona (Zone Alert) ---
-export async function createZoneAlert(alertData, token) {
-  const res = await fetch(`${API_BASE}/zone-alerts`, {
-    method: "POST",
+export async function updateDeviceAlert(alertId, alert, token) {
+  const res = await fetch(`${API_BASE}/device-alerts/${alertId}`, {
+    method: "PUT",
     headers: {
-      "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
     },
-    body: JSON.stringify(alertData),
+    body: JSON.stringify(alert),
   });
-  if (!res.ok) {
-    let msg = "No se pudo crear la alerta de zona";
-    try {
-      const err = await res.json();
-      msg = err.error || msg;
-    } catch {}
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error("Error al actualizar alerta de dispositivo");
   return await res.json();
 }
 
-// --- Obtener dispositivos con zonas (para Alerts.jsx) ---
-export async function fetchDevicesWithZones(token) {
-  const res = await fetch(`${API_BASE}/devices`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+export async function deleteDeviceAlert(alertId, token) {
+  const res = await fetch(`${API_BASE}/device-alerts/${alertId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
   });
-  if (!res.ok) {
-    let msg = "Error al obtener dispositivos con zonas";
-    try {
-      const err = await res.json();
-      if (err.error && err.error.includes("Token")) {
-        msg = "Tu sesión expiró. Por favor, inicia sesión nuevamente.";
-      } else if (err.error) {
-        msg = err.error;
-      }
-    } catch {}
-    throw new Error(msg);
-  }
+  if (!res.ok) throw new Error("Error al eliminar alerta de dispositivo");
+  return await res.json();
+}
+
+// --- HISTORIAL DE EVENTOS DE ALERTA POR ZONA ---
+export async function fetchZoneAlertEvents(zoneId, token) {
+  const res = await fetch(`${API_BASE}/zones/${zoneId}/alert-events`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Error al obtener eventos de alerta de zona");
   return await res.json();
 }
