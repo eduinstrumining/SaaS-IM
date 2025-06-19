@@ -57,6 +57,34 @@ function fillTimeRange(readings, desde, hasta) {
   return points;
 }
 
+// --- Estado de la zona según último dato ---
+function getZoneStatus(readings) {
+  if (!readings || readings.length === 0) {
+    return { estado: "Nunca", ultimo: null, color: "gray" };
+  }
+  const last = readings[readings.length - 1];
+  const lastDate = new Date(last.timestamp);
+  const now = new Date();
+  const diffMin = (now - lastDate) / 1000 / 60;
+  if (diffMin < 2) return { estado: "OK", ultimo: lastDate, color: "green" };
+  if (diffMin < 10) return { estado: "Retraso", ultimo: lastDate, color: "orange" };
+  return { estado: "Offline", ultimo: lastDate, color: "red" };
+}
+
+// --- Muestra tiempo desde última lectura ---
+function tiempoDesde(date) {
+  if (!date) return "";
+  const now = new Date();
+  const diffSec = Math.floor((now - date) / 1000);
+  if (diffSec < 60) return `hace ${diffSec}s`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `hace ${diffMin}min`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `hace ${diffHr}h`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `hace ${diffDay}d`;
+}
+
 export default function ZoneCard({
   zone,
   zoneLabel,
@@ -104,14 +132,13 @@ export default function ZoneCard({
     );
   }
 
-  // --------- INICIO CAMBIO: cálculo rango de días ---------
+  // Cálculo rango de días
   const msPorDia = 24 * 60 * 60 * 1000;
   const desdeDate = desde ? new Date(desde) : null;
   const hastaDate = hasta ? new Date(hasta) : null;
   const diffDias = (desdeDate && hastaDate)
     ? Math.ceil((hastaDate - desdeDate) / msPorDia)
     : 1;
-  // --------- FIN CAMBIO ---------
 
   const chartData = {
     labels: timeLabels,
@@ -131,7 +158,6 @@ export default function ZoneCard({
     ],
   };
 
-  // --------- INICIO CAMBIO EN chartOptions ---------
   const chartOptions = {
     plugins: {
       legend: { display: false },
@@ -187,14 +213,67 @@ export default function ZoneCard({
     responsive: true,
     maintainAspectRatio: false,
   };
-  // --------- FIN CAMBIO ---------
 
   let desdeStr = desde ? new Date(desde).toLocaleString("es-CL") : "";
   let hastaStr = hasta ? new Date(hasta).toLocaleString("es-CL") : "";
 
+  // --------- ESTADO Y TIEMPO DE ÚLTIMA LECTURA ---------
+  const { estado, ultimo, color } = getZoneStatus(zone.readings);
+
+  // --- Nueva lógica de mensajes diferenciados por tipo de ausencia de data ---
+  // Nunca hubo datos en esta zona
+  const nuncaHuboDatos = !zone.readings || zone.readings.length === 0;
+  // Hay data en algún momento (histórico), pero ninguna en el rango filtrado (después del filtrado por fecha/temperatura)
+  const sinDatosEnRango = zone.readings && zone.readings.length > 0 && filteredTemps.length === 0;
+
+  let mensajeSinDatos = null;
+  if (nuncaHuboDatos) {
+    mensajeSinDatos = (
+      <div className="flex flex-col items-center justify-center h-36 text-[#8C92A4]">
+        <span className="text-base font-bold mb-1">Esta zona nunca ha enviado datos.</span>
+        <span className="text-xs">Verifique instalación o espere primeras lecturas.</span>
+      </div>
+    );
+  } else if (sinDatosEnRango) {
+    mensajeSinDatos = (
+      <div className="flex flex-col items-center justify-center h-36 text-[#8C92A4]">
+        <span className="text-base font-bold mb-1">No hay datos en el rango seleccionado, pero sí existen datos históricos para esta zona.</span>
+        <span className="text-xs">Pruebe ajustando el rango de fechas.</span>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-flowforge-panel rounded-2xl p-6 shadow flex flex-col gap-4">
-      <h2 className="text-xl font-bold">{`Zona ${zoneLabel}`}</h2>
+      <div className="flex items-center gap-4 mb-2">
+        <h2 className="text-xl font-bold">{`Zona ${zoneLabel}`}</h2>
+        <span
+          className="inline-block px-4 py-1 rounded-xl font-bold text-xs"
+          style={{
+            color:
+              color === "green"
+                ? "#34d399"
+                : color === "orange"
+                ? "#f59e42"
+                : color === "red"
+                ? "#ef4444"
+                : "#8C92A4",
+            background:
+              color === "gray"
+                ? "#22252B"
+                : color === "green"
+                ? "#132817"
+                : color === "orange"
+                ? "#2d2110"
+                : "#220e0e",
+          }}
+        >
+          {estado}
+        </span>
+        <span className="ml-2 text-xs text-[#8C92A4]">
+          {ultimo ? `(${tiempoDesde(ultimo)})` : ""}
+        </span>
+      </div>
       <div className="flex flex-col md:flex-row items-end md:items-center gap-8">
         <div>
           <div className="text-4xl font-bold text-white">
@@ -223,7 +302,10 @@ export default function ZoneCard({
           </div>
         </div>
         <div className="flex-1 min-w-[240px] h-32 sm:h-36 md:h-40">
-          {filteredTemps.length > 1 ? (
+          {/* Si no hay datos en la zona, muestra el mensaje correspondiente */}
+          {mensajeSinDatos ? (
+            mensajeSinDatos
+          ) : filteredTemps.length > 1 ? (
             <Line data={chartData} options={chartOptions} />
           ) : (
             <div className="h-full flex items-center justify-center text-[#8C92A4]">

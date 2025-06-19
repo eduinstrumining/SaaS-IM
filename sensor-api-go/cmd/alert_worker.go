@@ -9,6 +9,7 @@ import (
 	"sensor-api-go/models"
 	"sensor-api-go/utils"
 
+	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"gorm.io/gorm"
 )
@@ -74,10 +75,36 @@ func revisarZonas(db *gorm.DB) {
 				motivo(reading.Temperature, za.UpperThresh, za.LowerThresh),
 			)
 
-			if err := utils.SendEmail(za.Recipient, subject, body); err != nil {
-				log.Printf("[ALERT WORKER] Error enviando alerta: %v", err)
+			// Intenta enviar el email y guarda el resultado del envío
+			sendErr := utils.SendEmail(za.Recipient, subject, body)
+			if sendErr != nil {
+				log.Printf("[ALERT WORKER] Error enviando alerta: %v", sendErr)
 			} else {
 				log.Printf("[ALERT WORKER] Alerta enviada: Cámara %d Zona %d -> %s", reading.CameraID, reading.ZoneID, za.Recipient)
+			}
+
+			// REGISTRA el evento de alerta (siempre, aunque falle el envío)
+			eventType := "upper"
+			threshold := za.UpperThresh
+			if reading.Temperature < za.LowerThresh {
+				eventType = "lower"
+				threshold = za.LowerThresh
+			}
+
+			event := models.ZoneAlertEvent{
+				ID:          uuid.New(),
+				ZoneID:      reading.ZoneID,
+				CameraID:    reading.CameraID,
+				Temperature: reading.Temperature,
+				Threshold:   threshold,
+				Type:        eventType,
+				Timestamp:   reading.Timestamp,
+				Recipient:   za.Recipient,
+				Sent:        sendErr == nil,
+				Error:       fmt.Sprintf("%v", sendErr),
+			}
+			if err := db.Create(&event).Error; err != nil {
+				log.Printf("[ALERT WORKER] Error registrando evento de alerta: %v", err)
 			}
 		}
 	}
